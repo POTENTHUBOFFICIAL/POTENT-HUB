@@ -46,6 +46,7 @@ local function showUnsupportedScreen()
 		screenGui.Parent = playersService.LocalPlayer:WaitForChild("PlayerGui")
 	end
 
+	-- Fondo negro a pantalla completa.
 	local bg = Instance.new("Frame")
 	bg.Size = UDim2.new(1, 0, 1, 0)
 	bg.BackgroundColor3 = Color3.new(0, 0, 0)
@@ -54,23 +55,95 @@ local function showUnsupportedScreen()
 	bg.ZIndex = 1
 	bg.Parent = screenGui
 
+	-- Contenedor central.
+	local main = Instance.new("Frame")
+	main.Size = UDim2.new(0, 520, 0, 260)
+	main.Position = UDim2.new(0.5, -260, 0.5, -130)
+	main.BackgroundTransparency = 1
+	main.ZIndex = 2
+	main.Parent = screenGui
+
+	-- Texto principal.
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, 0, 1, 0)
+	label.Size = UDim2.new(1, -40, 0, 140)
+	label.Position = UDim2.new(0, 20, 0, 0)
 	label.BackgroundTransparency = 1
-	label.Text = "THIS GAME NOT SUPORTED YET"
+	label.Text = "THIS GAME IS NOT YET SUPPORTED\nIF YOU WANT TO KNOW WHICH GAMES IT SUPPORTS, JOIN THE DISCORD SERVER"
 	label.TextColor3 = Color3.fromRGB(255, 255, 255)
 	label.Font = Enum.Font.GothamBold
-	label.TextScaled = true
+	label.TextSize = 22
 	label.TextWrapped = true
-	label.ZIndex = 2
-	label.Parent = bg
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.TextYAlignment = Enum.TextYAlignment.Center
+	label.ZIndex = 3
+	label.Parent = main
 
-	local padding = Instance.new("UIPadding")
-	padding.PaddingTop = UDim.new(0.3, 0)
-	padding.PaddingBottom = UDim.new(0.3, 0)
-	padding.PaddingLeft = UDim.new(0.1, 0)
-	padding.PaddingRight = UDim.new(0.1, 0)
-	padding.Parent = label
+	-- Botón estilo Discord (mismo estilo del Key System).
+	local discordBtn = Instance.new("TextButton")
+	discordBtn.Size = UDim2.new(0, 320, 0, 50)
+	discordBtn.Position = UDim2.new(0.5, -160, 0, 170)
+	discordBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+	discordBtn.BorderSizePixel = 0
+	discordBtn.Text = "💬 JOIN DISCORD FOR FREE KEY"
+	discordBtn.TextColor3 = Color3.new(1, 1, 1)
+	discordBtn.Font = Enum.Font.GothamBold
+	discordBtn.TextSize = 14
+	discordBtn.AutoButtonColor = false
+	discordBtn.ZIndex = 3
+	discordBtn.Parent = main
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = discordBtn
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(45, 45, 55)
+	stroke.Thickness = 1.5
+	stroke.Parent = discordBtn
+
+	-- Hover.
+	discordBtn.MouseEnter:Connect(function()
+		tweenService:Create(discordBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(114, 137, 218)}):Play()
+	end)
+	discordBtn.MouseLeave:Connect(function()
+		tweenService:Create(discordBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(88, 101, 242)}):Play()
+	end)
+
+	-- Texto de estado (feedback al copiar).
+	local status = Instance.new("TextLabel")
+	status.Size = UDim2.new(1, -40, 0, 20)
+	status.Position = UDim2.new(0, 20, 0, 228)
+	status.BackgroundTransparency = 1
+	status.Text = ""
+	status.TextColor3 = Color3.fromRGB(0, 200, 100)
+	status.Font = Enum.Font.GothamBold
+	status.TextSize = 12
+	status.ZIndex = 3
+	status.Parent = main
+
+	-- Click: copiar link del Discord.
+	discordBtn.MouseButton1Click:Connect(function()
+		if setclipboard then
+			setclipboard(DISCORD_URL)
+			status.Text = "✅ DISCORD LINK COPIED! JOIN AND GET YOUR KEY."
+			status.TextColor3 = Color3.fromRGB(0, 200, 100)
+		else
+			status.Text = "⚠️ COPY THIS LINK: " .. DISCORD_URL
+			status.TextColor3 = Color3.fromRGB(0, 200, 100)
+		end
+		task.delay(5, function()
+			if status and status.Parent then
+				status.Text = ""
+			end
+		end)
+	end)
+
+	-- Auto-cerrar después de 15 segundos.
+	task.delay(15, function()
+		if screenGui and screenGui.Parent then
+			screenGui:Destroy()
+		end
+	end)
 
 	return screenGui
 end
@@ -810,7 +883,8 @@ local function runMainScript()
 			autoClaimFree = state
 			if state then
 				runLoop("AutoClaimFreeReward", function() return autoClaimFree end, function()
-					if Remotes:FindFirstChild("ClaimFreeReward") then safeFire(Remotes.ClaimFreeReward) end				end, 5)
+					if Remotes:FindFirstChild("ClaimFreeReward") then safeFire(Remotes.ClaimFreeReward) end
+				end, 5)
 			else
 				stopLoop("AutoClaimFreeReward")
 			end
