@@ -6,7 +6,7 @@ end
 -- ============================================================
 -- POTENT HUB - MULTI GAME HUB (WindUI v1.1 Edition)
 -- 1. Speed Monkey Escape (114697347887839 / 72858062353423)
--- 2. Block Spin (104715542330896)
+-- 2. Block Spin (104715542330896) [UNDER MAINTENANCE]
 -- 3. Murder Mystery 2 (142823291)
 -- 4. Kitten Farm (77813828595591)
 -- ============================================================
@@ -383,6 +383,106 @@ local function createPotentWindow(windUI, folder, gameName)
 	end)
 
 	return window
+end
+
+-- ============================================================
+-- ========== MAINTENANCE SCREEN (5 SECONDS) ==========
+-- ============================================================
+local function showMaintenanceScreen()
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "PotentMaintenance"
+	screenGui.ResetOnSpawn = false
+	screenGui.DisplayOrder = 99999
+	screenGui.IgnoreGuiInset = true
+
+	local ok = pcall(function() screenGui.Parent = getGuiContainer() end)
+	if not ok then screenGui.Parent = playersService.LocalPlayer:WaitForChild("PlayerGui") end
+
+	local bg = Instance.new("Frame")
+	bg.Size = UDim2.new(1, 0, 1, 0)
+	bg.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+	bg.BorderSizePixel = 0
+	bg.ZIndex = 1
+	bg.Parent = screenGui
+
+	local main = Instance.new("Frame")
+	main.Size = UDim2.new(0, 520, 0, 300)
+	main.Position = UDim2.new(0.5, -260, 0.5, -150)
+	main.BackgroundTransparency = 1
+	main.ZIndex = 2
+	main.Parent = screenGui
+
+	local iconLabel = Instance.new("TextLabel")
+	iconLabel.Size = UDim2.new(1, 0, 0, 40)
+	iconLabel.Position = UDim2.new(0, 0, 0, 10)
+	iconLabel.BackgroundTransparency = 1
+	iconLabel.Text = "⚠️"
+	iconLabel.TextSize = 36
+	iconLabel.ZIndex = 3
+	iconLabel.Parent = main
+
+	local title = Instance.new("TextLabel")
+	title.Size = UDim2.new(1, 0, 0, 30)
+	title.Position = UDim2.new(0, 0, 0, 55)
+	title.BackgroundTransparency = 1
+	title.Text = "UNDER MAINTENANCE"
+	title.TextColor3 = Palette.Gold
+	title.Font = Enum.Font.GothamBold
+	title.TextSize = 22
+	title.ZIndex = 3
+	title.Parent = main
+
+	local desc = Instance.new("TextLabel")
+	desc.Size = UDim2.new(1, -40, 0, 70)
+	desc.Position = UDim2.new(0, 20, 0, 95)
+	desc.BackgroundTransparency = 1
+	desc.Text = "The script for this game is currently under maintenance.\nIf you want more information, please join our Discord server."
+	desc.TextColor3 = Color3.fromRGB(230, 230, 240)
+	desc.Font = Enum.Font.Gotham
+	desc.TextSize = 15
+	desc.TextWrapped = true
+	desc.ZIndex = 3
+	desc.Parent = main
+
+	local discordBtn = Instance.new("TextButton")
+	discordBtn.Size = UDim2.new(0, 300, 0, 48)
+	discordBtn.Position = UDim2.new(0.5, -150, 0, 185)
+	discordBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+	discordBtn.BorderSizePixel = 0
+	discordBtn.Text = "💬 JOIN DISCORD"
+	discordBtn.TextColor3 = Color3.new(1, 1, 1)
+	discordBtn.Font = Enum.Font.GothamBold
+	discordBtn.TextSize = 14
+	discordBtn.AutoButtonColor = false
+	discordBtn.ZIndex = 3
+	discordBtn.Parent = main
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = discordBtn
+
+	local status = Instance.new("TextLabel")
+	status.Size = UDim2.new(1, -40, 0, 20)
+	status.Position = UDim2.new(0, 20, 0, 245)
+	status.BackgroundTransparency = 1
+	status.Text = ""
+	status.TextColor3 = Color3.fromRGB(0, 200, 100)
+	status.Font = Enum.Font.GothamBold
+	status.TextSize = 12
+	status.ZIndex = 3
+	status.Parent = main
+
+	discordBtn.MouseButton1Click:Connect(function()
+		customSetClipboard(DISCORD_URL)
+		status.Text = "✅ DISCORD LINK COPIED!"
+	end)
+
+	-- Closes automatically after 5 seconds.
+	task.delay(5, function()
+		if screenGui and screenGui.Parent then
+			screenGui:Destroy()
+		end
+	end)
 end
 
 -- ============================================================
@@ -1294,356 +1394,6 @@ end
 
 local function runSpeedMonkeyEscape2()
 	runSpeedMonkeyEscape()
-end
-
--- ============================================================
--- ========== JUEGO 2: BLOCK SPIN ==========
--- ============================================================
-local function runBlockSpin()
-	local Remotes, Modules, Items, MeleeFolder
-	pcall(function() Remotes = replicatedStorage:WaitForChild("Remotes", 5) end)
-	pcall(function() Modules = replicatedStorage:WaitForChild("Modules", 5) end)
-	pcall(function() Items = replicatedStorage:WaitForChild("Items", 5) end)
-	pcall(function() if Items then MeleeFolder = Items:WaitForChild("melee", 5) end end)
-
-	local Util, Char
-	if Modules then
-		pcall(function() if Modules:FindFirstChild("Core") and Modules.Core:FindFirstChild("Util") then Util = require(Modules.Core.Util) end end)
-		pcall(function() if Modules:FindFirstChild("Core") and Modules.Core:FindFirstChild("Char") then Char = require(Modules.Core.Char) end end)
-	end
-
-	local LocalPlayer = playersService.LocalPlayer
-	local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-	local Camera = workspaceService.CurrentCamera
-	local CurrentCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-	local Humanoid = CurrentCharacter:WaitForChild("Humanoid")
-	local HRP = CurrentCharacter:WaitForChild("HumanoidRootPart")
-
-	if not Char then
-		Char = {
-			get_hum = function()
-				local char = LocalPlayer and LocalPlayer.Character
-				if char then return char:FindFirstChild("Humanoid") end
-				return nil
-			end,
-			current_char = { get = function() return LocalPlayer and LocalPlayer.Character end }
-		}
-	end
-
-	local SendRemote
-	pcall(function() if Remotes then SendRemote = Remotes:WaitForChild("Send", 5) end end)
-
-	local SilentAimEnabled, RedLineLockEnabled = false, false
-	local FOVRadius, CurrentTarget = 120, nil
-	local FOVCircle = Drawing.new("Circle")
-	FOVCircle.Thickness = 1
-	FOVCircle.Color = Color3.fromRGB(255, 50, 50)
-	FOVCircle.Transparency = 1
-	FOVCircle.Visible = false
-	local SafeFriends = {}
-	local JumpPowerEnabled, JumpPowerValue = false, 40
-	local AntiLockEnabled, AntiKillEnabled = false, false
-	local SnapUnderMapEnabled, SnapHeight, SnapOriginalY, SnapActive = false, 10, nil, false
-	local AutoAttackEnabled, AutoAttackDelay = false, 0.4
-	local PickupItemsEnabled = false
-	local SkipCrateEnabled = false
-	local GunMods = { FireRate = 1000, Accuracy = 1, Recoil = 0, Reload = 0.1, AutoApply = false, Auto = false }
-	local HighlightEnabled = false
-	local Highlights = {}
-
-	local WindUI = getWindUILibrary()
-	local Window = createPotentWindow(WindUI, "POTENTHUB_BLOCKSPIN", "Block Spin")
-
-	local function getPing()
-		local pg = LocalPlayer:FindFirstChild("PlayerGui")
-		if not pg then return 0.2 end
-		local ns = pg:FindFirstChild("NetworkStats")
-		if not ns then return 0.2 end
-		local pl = ns:FindFirstChild("PingLabel")
-		if not pl then return 0.2 end
-		local txt = pl.Text
-		if typeof(txt) ~= "string" then return 0.2 end
-		local n = tonumber(txt:match("%d+"))
-		if not n then return 0.2 end
-		local ping = n / 1000
-		if ping < 0 or ping > 2 then ping = 0.2 end
-		return ping
-	end
-	local function isPlayerExcluded(name)
-		for _, f in ipairs(SafeFriends) do
-			if f ~= "" and string.find(string.lower(name), string.lower(f)) then return true end
-		end
-		return false
-	end
-	local function getClosestTarget()
-		local closest, closestDist = nil, FOVRadius
-		local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-		for _, plr in ipairs(playersService:GetPlayers()) do
-			if plr ~= LocalPlayer and plr.Character then
-				local head = plr.Character:FindFirstChild("Head")
-				local hum = plr.Character:FindFirstChild("Humanoid")
-				local root = plr.Character:FindFirstChild("HumanoidRootPart")
-				if head and hum and hum.Health > 0 and root then
-					local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
-					if onScreen then
-						local sp = Vector2.new(screenPos.X, screenPos.Y)
-						local dist = (sp - center).Magnitude
-						if dist <= FOVRadius and not isPlayerExcluded(plr.Name) and dist < closestDist then
-							closestDist = dist
-							closest = plr
-						end
-					end
-				end
-			end
-		end
-		return closest
-	end
-	local function predictPosition(part, root)
-		if not part then return Vector3.zero end
-		local ping = getPing() or 0.2
-		if ping > 1 then ping = 0.2 end
-		local vel = (root and root.AssemblyLinearVelocity) or Vector3.zero
-		return part.Position + (vel * ping * 1.21)
-	end
-	local function setupCharacter(char)
-		CurrentCharacter = char
-		Humanoid = char:WaitForChild("Humanoid")
-		HRP = char:WaitForChild("HumanoidRootPart")
-	end
-	local function isDowned()
-		local hum = Char.get_hum and Char.get_hum()
-		if not hum then return false end
-		if hum.Health <= 0 then return false end
-		return hum:GetAttribute("HasBeenDowned") or hum:GetAttribute("IsDead")
-	end
-	local function getHRP()
-		local char = Char.current_char and Char.current_char.get and Char.current_char.get()
-		if not char then return nil end
-		return char:FindFirstChild("HumanoidRootPart")
-	end
-	local function getPlayersInRange(range)
-		local list = {}
-		local char = LocalPlayer.Character
-		if not char or not char.PrimaryPart then return list end
-		local myPos = char.PrimaryPart.Position
-		for _, plr in pairs(playersService:GetPlayers()) do
-			if plr ~= LocalPlayer and plr.Character and plr.Character.PrimaryPart then
-				local ok, dist = pcall(function() return (plr.Character.PrimaryPart.Position - myPos).Magnitude end)
-				if ok and dist and dist <= range then table.insert(list, plr) end
-			end
-		end
-		return list
-	end
-	local function getActiveTool()
-		local char = LocalPlayer and LocalPlayer.Character
-		if char then
-			for _, t in ipairs(char:GetChildren()) do
-				if pcall(function() return t:IsA("Tool") end) and t:IsA("Tool") then return t end
-			end
-		end
-		return nil
-	end
-	local function isMeleeTool(tool)
-		if not tool then return false end
-		if tool.Name == "Fists" then return true end
-		if MeleeFolder and MeleeFolder:FindFirstChild(tool.Name) then return true end
-		return false
-	end
-	local function AttackNearby()
-		if not SendRemote then return end
-		local char = LocalPlayer.Character
-		if not char or not char.PrimaryPart then return end
-		local tool = getActiveTool()
-		if not tool or not isMeleeTool(tool) then return end
-		local players = getPlayersInRange(20)
-		if #players == 0 then return end
-		local myPos = char.PrimaryPart.Position
-		local targets, positions = {}, {}
-		for _, plr in pairs(players) do
-			if plr and plr.Character and plr.Character.PrimaryPart then
-				local head = plr.Character:FindFirstChild("Head")
-				local root = plr.Character.PrimaryPart
-				if head and root then
-					local predicted = predictPosition(head, root)
-					table.insert(targets, plr)
-					table.insert(positions, predicted)
-				end
-			end
-		end
-		if #targets == 0 then return end
-		local lookCF = CFrame.lookAt(myPos, positions[1])
-		pcall(function() SendRemote:FireServer("melee_attack", tool, targets, lookCF, 0.75) end)
-	end
-	local function StartAutoAttack()
-		task.spawn(function()
-			while AutoAttackEnabled do
-				task.wait(AutoAttackDelay)
-				if AutoAttackEnabled and LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then pcall(AttackNearby) end
-			end
-		end)
-	end
-	local function performTeleport()
-		if not HRP then return end
-		local fromPos = HRP.Position
-		HRP.CFrame = CFrame.new(fromPos.X, fromPos.Y - SnapHeight, fromPos.Z)
-		SnapOriginalY = HRP.Position.Y
-	end
-	local function TrySkipCrate()
-		if not Modules then return end
-		local ok, Crate = pcall(function() return require(Modules.Game.CrateSystem.Crate) end)
-		if not (ok and Crate) then return end
-		task.spawn(function()
-			local spinning = Crate.spinning
-			if not spinning then return end
-			local t = 0
-			while not spinning.get() do
-				if t > 3 then break end
-				task.wait(0.05)
-				t = t + 0.05
-			end
-			if spinning.get() then pcall(function() Crate.skip_spin() end) end
-		end)
-	end
-	local function updateHighlight(plr)
-		if plr == LocalPlayer then return end
-		if not plr.Character then return end
-		if Highlights[plr] then Highlights[plr]:Destroy() Highlights[plr] = nil end
-		if HighlightEnabled then
-			local hl = Instance.new("Highlight")
-			hl.Adornee = plr.Character
-			hl.FillColor = Color3.fromRGB(0, 170, 255)
-			hl.OutlineColor = Color3.fromRGB(0, 170, 255)
-			hl.Parent = workspaceService
-			Highlights[plr] = hl
-		end
-	end
-
-	if SendRemote and SendRemote.FireServer and hookfunction then
-		pcall(function()
-			local oldFire = hookfunction(SendRemote.FireServer, function(self, ...)
-				if self ~= SendRemote then return oldFire(self, ...) end
-				local args = {...}
-				if SilentAimEnabled and args[2] == "shoot_gun" and CurrentTarget then
-					local head = CurrentTarget.Character and CurrentTarget.Character:FindFirstChild("Head")
-					local root = CurrentTarget.Character and CurrentTarget.Character:FindFirstChild("HumanoidRootPart")
-					if head and root then
-						local predicted = predictPosition(head, root)
-						local myHead = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
-						args[4] = CFrame.new(myHead and myHead.Position or nil, predicted)
-						args[5] = {[1] = {[1] = {Instance = head, Normal = Vector3.new(0, 1, 0), Position = predicted}}}
-					end
-				end
-				return oldFire(self, unpack(args))
-			end)
-		end)
-	end
-
-	runService.RenderStepped:Connect(function()
-		pcall(function()
-			CurrentTarget = (SilentAimEnabled or RedLineLockEnabled) and getClosestTarget() or nil
-			if FOVCircle then
-				FOVCircle.Visible = SilentAimEnabled
-				if SilentAimEnabled then
-					FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-					FOVCircle.Radius = FOVRadius
-				end
-			end
-			if JumpPowerEnabled and HRP then
-				local v = HRP.Velocity
-				HRP.Velocity = Vector3.new(v.X, JumpPowerValue, v.Z)
-			end
-		end)
-	end)
-
-	runService.Heartbeat:Connect(function()
-		if AntiKillEnabled and isDowned() then
-			local hrp = getHRP()
-			if hrp then hrp.CFrame = hrp.CFrame + Vector3.new(0, -55, 0) end
-		end
-	end)
-
-	LocalPlayer.CharacterAdded:Connect(setupCharacter)
-	if LocalPlayer.Character then setupCharacter(LocalPlayer.Character) end
-
-	userInputService.InputBegan:Connect(function(input, gp)
-		if gp then return end
-		if input.KeyCode == Enum.KeyCode.Z and SnapUnderMapEnabled then
-			SnapActive = not SnapActive
-			if SnapActive then performTeleport() else SnapOriginalY = nil end
-		end
-	end)
-
-	local CombatTab = Window:Tab({ Title = "🔫 Combat", Icon = "crosshair" })
-	local WeaponTab = Window:Tab({ Title = "🔧 Weapon", Icon = "layers" })
-	local ESPTab = Window:Tab({ Title = "👁️ ESP", Icon = "eye" })
-	local CharTab = Window:Tab({ Title = "👤 Character", Icon = "user" })
-	local BuyTab = Window:Tab({ Title = "🏦 Buy", Icon = "landmark" })
-	local MiscTab = Window:Tab({ Title = "🏬 Misc", Icon = "warehouse" })
-
-	CombatTab:Section({ Title = "🔫 Gun" })
-	CombatTab:Toggle({ Title = "Silent Aim", Value = false, Callback = function(state) SilentAimEnabled = state CurrentTarget = nil end })
-	CombatTab:Toggle({ Title = "Red Line Lock", Value = false, Callback = function(state) RedLineLockEnabled = state CurrentTarget = nil end })
-	CombatTab:Slider({ Title = "FOV", Step = 1, Value = { Min = 20, Max = 800, Default = 120 }, Callback = function(v) FOVRadius = tonumber(v) or 120 end })
-	CombatTab:Input({ Title = "Safe Friend", Value = "", Placeholder = "Name1 Name2", Callback = function(v)
-		SafeFriends = {}
-		for name in string.gmatch(v, "%S+") do table.insert(SafeFriends, name) end
-	end })
-
-	WeaponTab:Section({ Title = "🔧 Mods" })
-	WeaponTab:Slider({ Title = "Fire Rate", Step = 10, Value = { Min = 100, Max = 3000, Default = 1000 }, Callback = function(v) GunMods.FireRate = v end })
-	WeaponTab:Slider({ Title = "Accuracy", Step = 0.01, Value = { Min = 0, Max = 1, Default = 1 }, Callback = function(v) GunMods.Accuracy = v end })
-	WeaponTab:Slider({ Title = "Recoil", Step = 0.1, Value = { Min = 0, Max = 10, Default = 0 }, Callback = function(v) GunMods.Recoil = v end })
-	WeaponTab:Slider({ Title = "Reload Time", Step = 0.1, Value = { Min = 0.1, Max = 10, Default = 0.1 }, Callback = function(v) GunMods.Reload = v end })
-	WeaponTab:Toggle({ Title = "Automatic", Value = false, Callback = function(state) GunMods.Auto = state GunMods.AutoApply = state end })
-
-	WeaponTab:Section({ Title = "⚔️ Combat" })
-	WeaponTab:Toggle({ Title = "Auto Attack", Value = false, Callback = function(state) AutoAttackEnabled = state if state then StartAutoAttack() end end })
-
-	ESPTab:Section({ Title = "👁️ Visual" })
-	ESPTab:Toggle({ Title = "Name", Value = false, Callback = function(state) NameESP = state end })
-	ESPTab:Toggle({ Title = "Health", Value = false, Callback = function(state) HealthESP = state end })
-	ESPTab:Toggle({ Title = "Distance", Value = false, Callback = function(state) DistanceESP = state end })
-	ESPTab:Toggle({ Title = "Highlight", Value = false, Callback = function(state)
-		HighlightEnabled = state
-		for _, plr in pairs(playersService:GetPlayers()) do updateHighlight(plr) end
-	end })
-
-	CharTab:Section({ Title = "👤 Character" })
-	CharTab:Toggle({ Title = "Jump Power", Value = false, Callback = function(state) JumpPowerEnabled = state end })
-	CharTab:Toggle({ Title = "Anti Lock", Value = false, Callback = function(state) AntiLockEnabled = state end })
-	CharTab:Toggle({ Title = "Anti Kill", Value = false, Callback = function(state) AntiKillEnabled = state end })
-
-	CharTab:Section({ Title = "⚙️ Att" })
-	CharTab:Toggle({ Title = "Pickup Items", Value = false, Callback = function(state) PickupItemsEnabled = state end })
-
-	CharTab:Section({ Title = "📌 PC Hold (Z)" })
-	CharTab:Toggle({ Title = "Snap Under Map", Value = false, Callback = function(state)
-		SnapUnderMapEnabled = state
-		if state then SnapActive = true performTeleport()
-		else SnapActive = false SnapOriginalY = nil end
-	end })
-	CharTab:Slider({ Title = "Snap Distance", Step = 1, Value = { Min = 1, Max = 50, Default = 10 }, Callback = function(v) SnapHeight = v end })
-
-	BuyTab:Section({ Title = "🏦 Buy" })
-	BuyTab:Toggle({ Title = "Skip Crate Spin", Value = false, Callback = function(state) SkipCrateEnabled = state if state then TrySkipCrate() end end })
-
-	MiscTab:Button({ Title = "Server Rejoin", Callback = function()
-		teleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-	end })
-	MiscTab:Button({ Title = "Server Hop", Callback = function()
-		local ok, res = pcall(function()
-			return httpService:JSONDecode(customHttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"))
-		end)
-		if not ok or not res or not res.data then return end
-		for _, s in ipairs(res.data) do
-			if s.playing < s.maxPlayers and s.id ~= game.JobId then
-				teleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer)
-				return
-			end
-		end
-	end })
-
-	WindUI:Notify({ Title = "⚡ POTENT HUB", Content = "✅ Block Spin script loaded!", Duration = 4 })
 end
 
 -- ============================================================
@@ -3054,7 +2804,7 @@ local function launchGame()
 	if game.PlaceId == 114697347887839 or game.PlaceId == 72858062353423 then
 		runSpeedMonkeyEscape()
 	elseif game.PlaceId == 104715542330896 then
-		runBlockSpin()
+		showMaintenanceScreen()
 	elseif game.PlaceId == 142823291 then
 		runMM2()
 	elseif game.PlaceId == 77813828595591 then
