@@ -1,17 +1,17 @@
--- Check for table that is shared between executions.
-if not shared then
-	return warn("No shared, no script.")
-end
-
 -- ============================================================
 -- POTENT HUB - MULTI GAME HUB (WindUI v2.1 Edition)
 -- 1. Speed Monkey Escape (114697347887839 / 72858062353423)
--- 2. Block Spin (104715542330896) [UNDER MAINTENANCE]
+-- 2. BloxSpin (104715542330896)
 -- 3. Murder Mystery 2 (142823291)
 -- 4. Kitten Farm (77813828595591)
 -- 5. Speed Keyboard Escape (118941584817777 / 93411036959889)
 -- 6. One Tap (90568084448279)
 -- ============================================================
+
+-- Check for table that is shared between executions.
+if not shared then
+	return warn("No shared, no script.")
+end
 
 -- Services.
 local playersService = game:GetService("Players")
@@ -21,11 +21,14 @@ local userInputService = game:GetService("UserInputService")
 local workspaceService = game:GetService("Workspace")
 local collectionService = game:GetService("CollectionService")
 local virtualUser = game:GetService("VirtualUser")
+local virtualInputManager = game:GetService("VirtualInputManager")
 local tweenService = game:GetService("TweenService")
 local coreGui = game:GetService("CoreGui")
 local httpService = game:GetService("HttpService")
 local teleportService = game:GetService("TeleportService")
 local guiService = game:GetService("GuiService")
+local lighting = game:GetService("Lighting")
+local debris = game:GetService("Debris")
 
 -- Compatibility Layer.
 local customRequest = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
@@ -74,6 +77,7 @@ local SUPPORTED_PLACES = {
 }
 
 local ONETAP_PLACE_ID = 90568084448279
+local BLOXSPIN_PLACE_ID = 104715542330896
 
 local KEY_FILE = "potent_key.txt"
 local KEY_DURATION = 24 * 60 * 60
@@ -395,105 +399,6 @@ local function createPotentWindow(windUI, folder, gameName)
 end
 
 -- ============================================================
--- ========== MAINTENANCE SCREEN (5 SECONDS) ==========
--- ============================================================
-local function showMaintenanceScreen()
-	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "PotentMaintenance"
-	screenGui.ResetOnSpawn = false
-	screenGui.DisplayOrder = 99999
-	screenGui.IgnoreGuiInset = true
-
-	local ok = pcall(function() screenGui.Parent = getGuiContainer() end)
-	if not ok then screenGui.Parent = playersService.LocalPlayer:WaitForChild("PlayerGui") end
-
-	local bg = Instance.new("Frame")
-	bg.Size = UDim2.new(1, 0, 1, 0)
-	bg.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
-	bg.BorderSizePixel = 0
-	bg.ZIndex = 1
-	bg.Parent = screenGui
-
-	local main = Instance.new("Frame")
-	main.Size = UDim2.new(0, 520, 0, 300)
-	main.Position = UDim2.new(0.5, -260, 0.5, -150)
-	main.BackgroundTransparency = 1
-	main.ZIndex = 2
-	main.Parent = screenGui
-
-	local iconLabel = Instance.new("TextLabel")
-	iconLabel.Size = UDim2.new(1, 0, 0, 40)
-	iconLabel.Position = UDim2.new(0, 0, 0, 10)
-	iconLabel.BackgroundTransparency = 1
-	iconLabel.Text = "⚠️"
-	iconLabel.TextSize = 36
-	iconLabel.ZIndex = 3
-	iconLabel.Parent = main
-
-	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, 0, 0, 30)
-	title.Position = UDim2.new(0, 0, 0, 55)
-	title.BackgroundTransparency = 1
-	title.Text = "UNDER MAINTENANCE"
-	title.TextColor3 = Palette.Gold
-	title.Font = Enum.Font.GothamBold
-	title.TextSize = 22
-	title.ZIndex = 3
-	title.Parent = main
-
-	local desc = Instance.new("TextLabel")
-	desc.Size = UDim2.new(1, -40, 0, 70)
-	desc.Position = UDim2.new(0, 20, 0, 95)
-	desc.BackgroundTransparency = 1
-	desc.Text = "The script for this game is currently under maintenance.\nIf you want more information, please join our Discord server."
-	desc.TextColor3 = Color3.fromRGB(230, 230, 240)
-	desc.Font = Enum.Font.Gotham
-	desc.TextSize = 15
-	desc.TextWrapped = true
-	desc.ZIndex = 3
-	desc.Parent = main
-
-	local discordBtn = Instance.new("TextButton")
-	discordBtn.Size = UDim2.new(0, 300, 0, 48)
-	discordBtn.Position = UDim2.new(0.5, -150, 0, 185)
-	discordBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
-	discordBtn.BorderSizePixel = 0
-	discordBtn.Text = "💬 JOIN DISCORD"
-	discordBtn.TextColor3 = Color3.new(1, 1, 1)
-	discordBtn.Font = Enum.Font.GothamBold
-	discordBtn.TextSize = 14
-	discordBtn.AutoButtonColor = false
-	discordBtn.ZIndex = 3
-	discordBtn.Parent = main
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = discordBtn
-
-	local status = Instance.new("TextLabel")
-	status.Size = UDim2.new(1, -40, 0, 20)
-	status.Position = UDim2.new(0, 20, 0, 245)
-	status.BackgroundTransparency = 1
-	status.Text = ""
-	status.TextColor3 = Color3.fromRGB(0, 200, 100)
-	status.Font = Enum.Font.GothamBold
-	status.TextSize = 12
-	status.ZIndex = 3
-	status.Parent = main
-
-	discordBtn.MouseButton1Click:Connect(function()
-		customSetClipboard(DISCORD_URL)
-		status.Text = "✅ DISCORD LINK COPIED!"
-	end)
-
-	task.delay(5, function()
-		if screenGui and screenGui.Parent then
-			screenGui:Destroy()
-		end
-	end)
-end
-
--- ============================================================
 -- ========== UNSUPPORTED SCREEN ==========
 -- ============================================================
 local function showUnsupportedScreen()
@@ -536,7 +441,7 @@ local function showUnsupportedScreen()
 	supportLabel.Size = UDim2.new(1, -40, 0, 60)
 	supportLabel.Position = UDim2.new(0, 20, 0, 145)
 	supportLabel.BackgroundTransparency = 1
-	supportLabel.Text = "🟢 Support:\nSpeed Monkey Escape, Block Spin, Murder Mystery 2, Kitten Farm, Speed Keyboard Escape, One Tap"
+	supportLabel.Text = "🟢 Support:\nSpeed Monkey Escape, BloxSpin, Murder Mystery 2, Kitten Farm, Speed Keyboard Escape, One Tap"
 	supportLabel.TextColor3 = Color3.fromRGB(0, 200, 100)
 	supportLabel.Font = Enum.Font.GothamBold
 	supportLabel.TextSize = 13
@@ -1398,6 +1303,674 @@ local function runSpeedMonkeyEscape()
 		end
 	})
 	WindUI:Notify({ Title = "⚡ POTENT HUB", Content = "✅ GUI loaded for " .. GameName, Duration = 4 })
+end
+
+-- ============================================================
+-- ========== JUEGO 2: BLOXSPIN ==========
+-- ============================================================
+local function runBloxSpin()
+	local LocalPlayer = playersService.LocalPlayer
+
+	if not game:IsLoaded() then game.Loaded:Wait() end
+
+	local PlayerGui
+	repeat task.wait() PlayerGui = LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui") until PlayerGui
+	local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local Humanoid = Character:WaitForChild("Humanoid", 10)
+	local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart", 10)
+	local Backpack = LocalPlayer:WaitForChild("Backpack")
+	local Camera = workspaceService.CurrentCamera
+
+	-- Módulos del juego
+	local Networking, Data, Sprint, Ragdoll, Crate, Vehicle, CharModule
+	pcall(function()
+		Networking = replicatedStorage:WaitForChild("Modules", 10):WaitForChild("Core", 10):WaitForChild("Net", 10)
+	end)
+	pcall(function() CharModule = require(replicatedStorage.Modules.Core.Char) end)
+	pcall(function() Data = require(replicatedStorage.Modules.Core.Data) end)
+	pcall(function() Sprint = require(replicatedStorage.Modules.Game.Sprint) end)
+	pcall(function() Ragdoll = require(replicatedStorage.Modules.Game.Ragdoll) end)
+	pcall(function() Crate = require(replicatedStorage.Modules.Game.CrateSystem.Crate) end)
+	pcall(function() Vehicle = require(replicatedStorage.Modules.Game.VehicleSystem.Vehicle) end)
+
+	local DroppedItems = workspaceService:FindFirstChild("DroppedItems")
+	local Vehicles = workspaceService:FindFirstChild("Vehicles")
+
+	-- State
+	local Flags = {}
+	local Loops = {}
+	local Connections = {}
+
+	local function startLoop(id, fn, interval)
+		if Loops[id] then task.cancel(Loops[id]) Loops[id] = nil end
+		Flags[id] = true
+		Loops[id] = task.spawn(function()
+			while Flags[id] do
+				pcall(fn)
+				task.wait(interval or 0.1)
+			end
+			Loops[id] = nil
+		end)
+	end
+
+	local function stopLoop(id)
+		Flags[id] = false
+		if Loops[id] then task.cancel(Loops[id]) Loops[id] = nil end
+	end
+
+	local function getCharacter()
+		Character = LocalPlayer.Character
+		if not Character then return nil end
+		Humanoid = Character:FindFirstChildOfClass("Humanoid")
+		HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+		return Character
+	end
+
+	local function distanceTo(target)
+		if not HumanoidRootPart then return math.huge end
+		if typeof(target) == "Instance" then
+			if target:IsA("BasePart") then
+				return (target.Position - HumanoidRootPart.Position).Magnitude
+			end
+			if target:IsA("Model") then
+				return (target:GetPivot().Position - HumanoidRootPart.Position).Magnitude
+			end
+		elseif typeof(target) == "Vector3" then
+			return (target - HumanoidRootPart.Position).Magnitude
+		end
+		return math.huge
+	end
+
+	local WindUI = getWindUILibrary()
+	local window = createPotentWindow(WindUI, "POTENTHUB_BLOXSPIN", "POTENT HUB - BloxSpin")
+
+	local function notify(title, content, duration)
+		pcall(function()
+			WindUI:Notify({ Title = title, Content = content, Duration = duration or 3 })
+		end)
+	end
+
+	local generalTab = window:Tab({ Title = "🏠 General", Icon = "house" })
+	local vehicleTab = window:Tab({ Title = "🚗 Vehicle", Icon = "car" })
+	local visualTab = window:Tab({ Title = "👁️ Visual", Icon = "eye" })
+	local pvpTab = window:Tab({ Title = "⚔️ PVP", Icon = "crosshair" })
+	local miscTab = window:Tab({ Title = "⚙️ Misc", Icon = "box" })
+
+	-- GENERAL TAB
+	generalTab:Section({ Title = "ℹ️ Info" })
+	generalTab:Paragraph({ Title = "Game", Desc = "BloxSpin" })
+	generalTab:Paragraph({ Title = "PlaceId", Desc = tostring(game.PlaceId) })
+
+	local bankPara = generalTab:Paragraph({ Title = "🏦 Bank", Desc = "$0" })
+	local handPara = generalTab:Paragraph({ Title = "💵 Cash", Desc = "$0" })
+
+	task.spawn(function()
+		while true do
+			task.wait(1)
+			pcall(function()
+				if Data and Data.money then
+					bankPara:SetDesc("$" .. tostring(Data.money.bank or 0))
+					handPara:SetDesc("$" .. tostring(Data.money.hand or 0))
+				end
+			end)
+		end
+	end)
+
+	generalTab:Section({ Title = "🏃 Humanoid" })
+	generalTab:Toggle({
+		Title = "Speed Custom",
+		Desc = "Custom walk speed",
+		Value = false,
+		Callback = function(state)
+			Flags.WalkSpeedCustom = state
+			Flags.WalkSpeedLoop = state
+		end,
+	})
+	generalTab:Slider({
+		Title = "Speed Value",
+		Step = 0.1,
+		Value = { Min = 1, Max = 3.5, Default = 1 },
+		Callback = function(v) Flags.WalkSpeedValue = v end,
+	})
+	generalTab:Toggle({
+		Title = "Jump Custom",
+		Desc = "Custom jump power",
+		Value = false,
+		Callback = function(state) Flags.JumpPowerCustom = state end,
+	})
+	generalTab:Slider({
+		Title = "Jump Value",
+		Step = 1,
+		Value = { Min = 1, Max = 25, Default = 10 },
+		Callback = function(v) Flags.JumpPowerValue = v end,
+	})
+
+	generalTab:Section({ Title = "⛏️ Underground" })
+	generalTab:Toggle({
+		Title = "Snap Underground",
+		Desc = "Enable underground snap",
+		Value = false,
+		Callback = function(state)
+			Flags.Snap = state
+			if state then startLoop("Snap", function()
+				if getCharacter() and HumanoidRootPart then
+					local snapY = Flags.SnapBaseY
+					if not snapY then
+						snapY = HumanoidRootPart.Position.Y
+						Flags.SnapBaseY = snapY
+					end
+					local targetY = snapY - (Flags.SnapAmount or 10)
+					local diff = targetY - HumanoidRootPart.Position.Y
+					Character:PivotTo(HumanoidRootPart.CFrame * CFrame.new(0, diff, 0))
+				end
+			end, 0.05)
+			else
+				Flags.SnapBaseY = nil
+				stopLoop("Snap")
+			end
+		end,
+	})
+	generalTab:Slider({
+		Title = "Snap Amount",
+		Step = 1,
+		Value = { Min = 1, Max = 150, Default = 10 },
+		Callback = function(v) Flags.SnapAmount = v end,
+	})
+
+	generalTab:Section({ Title = "📦 Item Grabber" })
+	generalTab:Toggle({
+		Title = "Item Dropped Grabber",
+		Desc = "Auto grab dropped items",
+		Value = false,
+		Callback = function(state)
+			Flags.ItemDroppedGraber = state
+			if state then startLoop("ItemGrab", function()
+				if not Networking or not DroppedItems then return end
+				for _, item in ipairs(DroppedItems:GetChildren()) do
+					if item:IsA("Model") and item:FindFirstChild("PickUpZone") and distanceTo(item) < 15 then
+						pcall(function() Networking:Get("pickup_dropped_item", item) end)
+					end
+				end
+			end, 0.3)
+			else stopLoop("ItemGrab") end
+		end,
+	})
+
+	generalTab:Section({ Title = "⚙️ Etc" })
+	generalTab:Toggle({
+		Title = "Infinite Stamina",
+		Desc = "Unlimited stamina",
+		Value = false,
+		Callback = function(state) Flags.InfStamina = state end,
+	})
+	generalTab:Toggle({
+		Title = "Auto Respawn",
+		Desc = "Auto respawn on death",
+		Value = false,
+		Callback = function(state)
+			Flags.AutoRespawn = state
+			if state then startLoop("AutoRespawn", function()
+				if not Networking then return end
+				local ds = PlayerGui:FindFirstChild("DeathScreen")
+				ds = ds and ds:FindFirstChild("DeathScreenHolder")
+				if not ds or not ds.Visible then return end
+				local frame = ds.Frame
+				frame = frame and frame:FindFirstChild("RespawnButtonFrame")
+				frame = frame and frame:FindFirstChild("RespawnButton")
+				frame = frame and frame:FindFirstChild("TextLabel")
+				if frame and frame.Text == "Respawn" then
+					Networking:FireServer("death_screen_request_respawn")
+				end
+			end, 1)
+			else stopLoop("AutoRespawn") end
+		end,
+	})
+	generalTab:Toggle({
+		Title = "Hide Name",
+		Desc = "Hide your own name",
+		Value = false,
+		Callback = function(state)
+			Flags.HideName = state
+			if HumanoidRootPart then
+				local bb = HumanoidRootPart:FindFirstChild("CharacterBillboardGui")
+				if bb then bb.Enabled = not state end
+			end
+		end,
+	})
+	generalTab:Toggle({
+		Title = "Anti Ragdoll",
+		Desc = "Prevent ragdoll",
+		Value = false,
+		Callback = function(state) Flags.AntiRagdoll = state end,
+	})
+	generalTab:Toggle({
+		Title = "Anti Aim Assist",
+		Desc = "Prevent aim assist locks",
+		Value = false,
+		Callback = function(state)
+			Flags.AntiAimAssiant = state
+			if state then startLoop("AntiAim", function()
+				if not CharModule then return end
+				local hum = CharModule.get_hum()
+				if hum and not hum:GetAttribute("HasBeenDowned") then
+					local hrp = CharModule.get_hrp()
+					if hrp then
+						local v, av, aav = hrp.Velocity, hrp.AssemblyLinearVelocity, hrp.AssemblyAngularVelocity
+						hrp.Velocity = Vector3.new(math.random(-99999, 99999), math.random(-99999, 99999), math.random(-99999, 99999))
+						hrp.AssemblyLinearVelocity = hrp.Velocity
+						hrp.AssemblyAngularVelocity = hrp.Velocity
+						runService.RenderStepped:Wait()
+						hrp.Velocity, hrp.AssemblyLinearVelocity, hrp.AssemblyAngularVelocity = v, av, aav
+					end
+				end
+			end, 0.05)
+			else stopLoop("AntiAim") end
+		end,
+	})
+
+	-- VEHICLE TAB
+	vehicleTab:Section({ Title = "🚗 Vehicle Settings" })
+	vehicleTab:Toggle({
+		Title = "Speed Boost Vehicle",
+		Desc = "Boost vehicle speed",
+		Value = false,
+		Callback = function(state)
+			Flags.SpeedBostVehicle = state
+			if state then startLoop("VehicleBoost", function()
+				if not Vehicle then return end
+				local car = Vehicle.get_car_player_is_in()
+				if car and car.PrimaryPart then
+					local vel = car.PrimaryPart.AssemblyLinearVelocity
+					local look = car.PrimaryPart.CFrame.LookVector
+					if vel.Magnitude > 0 then
+						local boost = look * (Flags.VehicleSpeedBost or 45)
+						car.PrimaryPart.AssemblyLinearVelocity = Vector3.new(boost.X, vel.Y, boost.Z)
+					end
+				end
+			end, 0.05)
+			else stopLoop("VehicleBoost") end
+		end,
+	})
+	vehicleTab:Slider({
+		Title = "Vehicle Speed",
+		Step = 1,
+		Value = { Min = 20, Max = 80, Default = 45 },
+		Callback = function(v) Flags.VehicleSpeedBost = v end,
+	})
+
+	vehicleTab:Section({ Title = "🚙 Vehicle Actions" })
+	vehicleTab:Button({
+		Title = "Pull Your Vehicle",
+		Desc = "Pull your vehicle to you",
+		Callback = function()
+			if not Vehicles then notify("Vehicle", "Vehicles not found", 3) return end
+			for _, v in ipairs(Vehicles:GetChildren()) do
+				if v:IsA("Model") and v:GetAttribute("OwnerUserId") == LocalPlayer.UserId then
+					v:PivotTo(HumanoidRootPart.CFrame * CFrame.new(0, 5, -5))
+					notify("Vehicle", "Vehicle pulled", 2)
+					return
+				end
+			end
+			notify("Vehicle", "No vehicle found", 3)
+		end,
+	})
+	vehicleTab:Button({
+		Title = "Crash Current Vehicle",
+		Desc = "Explode the vehicle you're in",
+		Callback = function()
+			if not Networking or not Vehicle then notify("Vehicle", "Not available", 3) return end
+			local car = Vehicle.get_car_player_is_in()
+			if not car then notify("Vehicle", "Not in a vehicle", 3) return end
+			for i = 1, 15 do
+				Networking:FireServer("crashed_car", car, 150)
+			end
+			notify("Vehicle", "Vehicle crashed", 2)
+		end,
+	})
+
+	-- VISUAL TAB
+	local ESPData = {}
+	local function createDrawing(class, props)
+		if not Drawing then return nil end
+		local d = Drawing.new(class)
+		for k, v in pairs(props or {}) do d[k] = v end
+		return d
+	end
+
+	local function worldToViewport(pos)
+		local v3 = typeof(pos) == "Vector3" and pos or pos.Position
+		local sp, onScreen = Camera:WorldToViewportPoint(v3)
+		return Vector2.new(sp.X, sp.Y), onScreen, sp.Z
+	end
+
+	local function setupESPForPlayer(plr)
+		if plr == LocalPlayer or ESPData[plr] then return end
+		if not Drawing then return end
+		ESPData[plr] = {
+			Box = createDrawing("Square", { Visible = false, Color = Color3.fromRGB(201, 12, 204), Thickness = 1, Filled = false }),
+			Name = createDrawing("Text", { Visible = false, Color = Color3.new(1,1,1), Size = 15, Center = true, Outline = true, Text = plr.Name }),
+			Distance = createDrawing("Text", { Visible = false, Color = Color3.new(1,1,1), Size = 15, Center = true, Outline = true, Text = "" }),
+			HPBar = createDrawing("Line", { Visible = false, Color = Color3.new(0,1,0), Thickness = 2 }),
+		}
+	end
+
+	local function removeESPForPlayer(plr)
+		if not ESPData[plr] then return end
+		for _, d in pairs(ESPData[plr]) do
+			pcall(function() d:Remove() end)
+		end
+		ESPData[plr] = nil
+	end
+
+	if Drawing then
+		for _, plr in ipairs(playersService:GetPlayers()) do setupESPForPlayer(plr) end
+		table.insert(Connections, playersService.PlayerAdded:Connect(setupESPForPlayer))
+		table.insert(Connections, playersService.PlayerRemoving:Connect(removeESPForPlayer))
+
+		startLoop("ESP", function()
+			if not Camera then return end
+			for plr, data in pairs(ESPData) do
+				local char = plr.Character
+				local hum = char and char:FindFirstChildOfClass("Humanoid")
+				local hrp = char and char:FindFirstChild("HumanoidRootPart")
+				local head = char and char:FindFirstChild("Head")
+				if not (char and hum and hrp and head and hum.Health > 0) then
+					for _, d in pairs(data) do d.Visible = false end
+					continue
+				end
+				local sp, onScreen = worldToViewport(hrp.Position)
+				if not onScreen then
+					for _, d in pairs(data) do d.Visible = false end
+					continue
+				end
+				local headSP = worldToViewport(head.Position + Vector3.new(0, 0.5, 0))
+				local feetSP = worldToViewport(hrp.Position - Vector3.new(0, 3, 0))
+				local boxH = headSP.Y - feetSP.Y
+				local boxW = 1000 / sp.Z
+				data.Box.Size = Vector2.new(boxW, boxH)
+				data.Box.Position = Vector2.new(sp.X - boxW / 2, sp.Y - boxH / 2)
+				data.Box.Visible = Flags.BoxPlayerVisual or false
+				data.Name.Position = Vector2.new(headSP.X, headSP.Y - 20)
+				data.Name.Visible = Flags.NamePlayerVisual or false
+				data.Distance.Position = Vector2.new(headSP.X, feetSP.Y + 5)
+				data.Distance.Text = "[" .. math.floor((hrp.Position - HumanoidRootPart.Position).Magnitude) .. "m]"
+				data.Distance.Visible = Flags.DistancePlayerVisual or false
+				local hpRatio = hum.Health / hum.MaxHealth
+				data.HPBar.From = Vector2.new(data.Box.Position.X + boxW + 5, data.Box.Position.Y + boxH * (1 - hpRatio))
+				data.HPBar.To = Vector2.new(data.Box.Position.X + boxW + 5, data.Box.Position.Y + boxH)
+				data.HPBar.Color = Color3.new(1 - hpRatio, hpRatio, 0)
+				data.HPBar.Visible = Flags.HealthPlayerVisual or false
+			end
+		end, 0.05)
+	end
+
+	visualTab:Section({ Title = "👁️ Player Visual" })
+	visualTab:Toggle({ Title = "ESP Name", Desc = "Show player names", Value = false, Callback = function(s) Flags.NamePlayerVisual = s end })
+	visualTab:Toggle({ Title = "ESP Box", Desc = "Show player boxes", Value = false, Callback = function(s) Flags.BoxPlayerVisual = s end })
+	visualTab:Toggle({ Title = "ESP Health", Desc = "Show player health", Value = false, Callback = function(s) Flags.HealthPlayerVisual = s end })
+	visualTab:Toggle({ Title = "ESP Distance", Desc = "Show player distance", Value = false, Callback = function(s) Flags.DistancePlayerVisual = s end })
+	visualTab:Toggle({ Title = "ESP Inventory", Desc = "Show player inventory", Value = false, Callback = function(s) Flags.InventoryPlayerVisual = s end })
+
+	visualTab:Section({ Title = "📦 Item Drop Visual" })
+	visualTab:Toggle({ Title = "Show Item Drop", Desc = "Show dropped items", Value = false, Callback = function(s) Flags.ItemDropVisual = s end })
+	visualTab:Dropdown({
+		Title = "Blacklist Rarity",
+		Values = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Omega"},
+		Value = "Common",
+		Callback = function(v) Flags.BlacklistRarity = v end,
+	})
+
+	visualTab:Section({ Title = "🚀 Performance" })
+	visualTab:Button({
+		Title = "Low Quality Mode",
+		Desc = "Reduce visual quality for FPS",
+		Callback = function()
+			pcall(function()
+				lighting.FogEnd = 10000000000
+				lighting.FogStart = 10000000000
+				lighting.Brightness = 1.2
+				lighting.GlobalShadows = false
+				lighting.EnvironmentDiffuseScale = 0.5
+				lighting.EnvironmentSpecularScale = 0.3
+				lighting.ShadowSoftness = 0
+				for _, effect in ipairs(lighting:GetChildren()) do
+					if effect:IsA("BloomEffect") then effect.Intensity = 0.2 end
+					if effect:IsA("BlurEffect") then effect.Size = 0 end
+					if effect:IsA("SunRaysEffect") then effect.Intensity = 0.1 end
+					if effect:IsA("ColorCorrectionEffect") then effect.Saturation = 0.7 end
+				end
+				for _, part in ipairs(workspaceService:GetDescendants()) do
+					if part:IsA("BasePart") then
+						part.Material = Enum.Material.SmoothPlastic
+						part.CastShadow = false
+						part.Reflectance = 0
+					end
+				end
+				if setfpscap then pcall(setfpscap, 240) end
+			end)
+			notify("Performance", "Low quality mode enabled", 3)
+		end,
+	})
+
+	-- PVP TAB
+	local AimTarget = nil
+	local PovCircle = Drawing and Drawing.new("Circle") or nil
+	if PovCircle then
+		PovCircle.Visible = false
+		PovCircle.Color = Color3.new(1, 1, 1)
+		PovCircle.Thickness = 1
+		PovCircle.Filled = false
+		PovCircle.NumSides = 64
+	end
+
+	local function findAimTarget()
+		if not HumanoidRootPart or not Camera then return nil end
+		local best, bestDist = nil, math.huge
+		local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+		for _, plr in ipairs(playersService:GetPlayers()) do
+			if plr ~= LocalPlayer and plr.Character then
+				local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+				local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+				if hum and hrp and hum.Health > 0 then
+					if not plr:GetAttribute("IsSafeZoneProtected") and not plr.Character:GetAttribute("IsSpawnProtected") then
+						if not (Flags.FriendIngore and plr:IsFriendsWith(LocalPlayer.UserId)) then
+							local sp, onScreen = worldToViewport(hrp.Position)
+							if onScreen then
+								local d = (sp - center).Magnitude
+								if d <= (Flags.PovSize or 250) and d < bestDist then
+									best, bestDist = plr, d
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+		return best
+	end
+
+	if PovCircle then
+		startLoop("AimAssist", function()
+			if not Camera then return end
+			PovCircle.Radius = Flags.PovSize or 250
+			PovCircle.Visible = Flags.AimAssiant or false
+			PovCircle.Color = Flags.RainbowPov and Color3.fromHSV(tick() % 5 / 5, 1, 1) or Color3.new(1, 1, 1)
+			PovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+			if Flags.AimAssiant then
+				AimTarget = findAimTarget()
+			else
+				AimTarget = nil
+			end
+		end, 0.05)
+	end
+
+	pvpTab:Section({ Title = "🎯 PVP Settings" })
+	pvpTab:Toggle({ Title = "Aim Assist", Desc = "Aim assist lock", Value = false, Callback = function(s) Flags.AimAssiant = s end })
+	pvpTab:Toggle({ Title = "Wall Bang", Desc = "Shoot through walls", Value = false, Callback = function(s) Flags.WallBang = s end })
+	pvpTab:Toggle({ Title = "Multi Shoot", Desc = "Shoot x2 per bullet", Value = false, Callback = function(s) Flags.MultiShoot = s end })
+	pvpTab:Toggle({ Title = "Ignore Friends", Desc = "Skip friends in aim assist", Value = false, Callback = function(s) Flags.FriendIngore = s end })
+	pvpTab:Toggle({ Title = "Rainbow POV", Desc = "Rainbow circle", Value = false, Callback = function(s) Flags.RainbowPov = s end })
+	pvpTab:Dropdown({
+		Title = "Target Part",
+		Values = {"Head", "HumanoidRootPart"},
+		Value = "Head",
+		Callback = function(v) Flags.PartTargetSelected = v end,
+	})
+	pvpTab:Slider({
+		Title = "POV Size",
+		Step = 1,
+		Value = { Min = 150, Max = 800, Default = 250 },
+		Callback = function(v) Flags.PovSize = v end,
+	})
+
+	pvpTab:Section({ Title = "🔫 Gun Customization" })
+	pvpTab:Toggle({ Title = "Automatic Mode", Desc = "Auto fire mode", Value = false, Callback = function(s) Flags.AutomaticGun = s end })
+	pvpTab:Slider({ Title = "Fire Rate", Step = 1, Value = { Min = 100, Max = 3000, Default = 1000 }, Callback = function(v) Flags.FireRateGun = v end })
+	pvpTab:Slider({ Title = "Recoil", Step = 0.1, Value = { Min = 0, Max = 10, Default = 0 }, Callback = function(v) Flags.RecoilGun = v end })
+	pvpTab:Slider({ Title = "Accuracy", Step = 0.01, Value = { Min = 0, Max = 1, Default = 1 }, Callback = function(v) Flags.AccuracyGun = v end })
+	pvpTab:Slider({ Title = "Durability", Step = 1, Value = { Min = 100, Max = 3000, Default = 1000 }, Callback = function(v) Flags.DurabilityGun = v end })
+	pvpTab:Button({
+		Title = "Apply Gun Settings",
+		Desc = "Apply to currently held gun",
+		Callback = function()
+			if not Character then return end
+			local tool = Character:FindFirstChildWhichIsA("Tool")
+			if not tool then notify("Gun", "No gun equipped", 3) return end
+			pcall(function()
+				local gunFolder = replicatedStorage:FindFirstChild("Items")
+				gunFolder = gunFolder and gunFolder:FindFirstChild("gun")
+				if not gunFolder then return end
+				for _, gun in ipairs(gunFolder:GetChildren()) do
+					if tool.Name == gun.Name then
+						tool:SetAttribute("fire_rate", Flags.FireRateGun or tool:GetAttribute("fire_rate"))
+						tool:SetAttribute("accuracy", Flags.AccuracyGun or tool:GetAttribute("accuracy"))
+						tool:SetAttribute("Recoil", Flags.RecoilGun or tool:GetAttribute("Recoil"))
+						tool:SetAttribute("Durability", Flags.DurabilityGun or tool:GetAttribute("Durability"))
+						tool:SetAttribute("automatic", Flags.AutomaticGun or tool:GetAttribute("automatic"))
+						notify("Gun", "Settings applied", 2)
+					end
+				end
+			end)
+		end,
+	})
+
+	-- MISC TAB
+	miscTab:Section({ Title = "🎁 Crate & Quest" })
+	miscTab:Button({
+		Title = "Skip Crate Spin",
+		Desc = "Skip crate spin animation",
+		Callback = function()
+			if not Crate then notify("Crate", "Not available", 3) return end
+			pcall(function()
+				if Crate.spinning and Crate.spinning.get() then return end
+				Crate.skip_spin()
+				notify("Crate", "Spin skipped", 2)
+			end)
+		end,
+	})
+	miscTab:Button({
+		Title = "Claim All Quests",
+		Desc = "Claim all quests at once",
+		Callback = function()
+			if not Networking then return end
+			pcall(function()
+				local quests = PlayerGui:FindFirstChild("Quests")
+				if not quests then return end
+				local holder = quests:FindFirstChild("QuestsHolder")
+				if not holder then return end
+				local frame = holder:FindFirstChild("QuestsScrollingFrame")
+				if not frame then return end
+				for _, v in ipairs(frame:GetChildren()) do
+					if v:IsA("Frame") or v:IsA("TextButton") or v:IsA("ImageButton") then
+						Networking:Get("claim_quest", v.Name)
+					end
+				end
+				notify("Quests", "All quests claimed", 2)
+			end)
+		end,
+	})
+
+	miscTab:Section({ Title = "🗑️ Unload" })
+	miscTab:Button({
+		Title = "Unload GUI",
+		Desc = "Unload the script",
+		Callback = function()
+			for _, conn in ipairs(Connections) do pcall(function() conn:Disconnect() end) end
+			for id in pairs(Loops) do stopLoop(id) end
+			pcall(function() window:Destroy() end)
+		end,
+	})
+
+	-- Anti Ragdoll hook
+	if Ragdoll and Ragdoll.is_ragdolling and Ragdoll.is_ragdolling.get then
+		local origGet = Ragdoll.is_ragdolling.get
+		Ragdoll.is_ragdolling.get = function(...)
+			local r = origGet(...)
+			if r == true and Flags.AntiRagdoll and Networking then
+				pcall(function()
+					Ragdoll.is_ragdolling.set(false)
+					Networking:FireServer("end_ragdoll_early")
+					Networking:FireServer("clear_ragdoll")
+				end)
+			end
+			return r
+		end
+	end
+
+	-- Inf Stamina hook
+	pcall(function()
+		if Sprint and Sprint.consume_stamina then
+			local bar = debug.getupvalue(Sprint.consume_stamina, 2).sprint_bar
+			if bar and bar.update then
+				local origUpdate = bar.update
+				bar.update = function(...)
+					if Flags.InfStamina then return function() return 1 end end
+					return origUpdate(...)
+				end
+			end
+		end
+	end)
+
+	-- Humanoid loop
+	startLoop("Humanoid", function()
+		getCharacter()
+		if not Humanoid or not HumanoidRootPart then return end
+		if Flags.JumpPowerCustom then
+			Humanoid.JumpHeight = Flags.JumpPowerValue or 3.89
+		else
+			Humanoid.JumpHeight = 3.89
+		end
+		local moveDir = Humanoid.MoveDirection
+		if moveDir.Magnitude > 0 and Flags.WalkSpeedCustom then
+			pcall(function()
+				if Networking then Networking:FireServer("set_sprinting_1", true) end
+			end)
+			if Humanoid:GetAttribute("TargetWalkSpeed") ~= 30 and Humanoid.WalkSpeed ~= 30 then
+				Humanoid:SetAttribute("TargetWalkSpeed", 30)
+				Humanoid.WalkSpeed = 30
+			end
+			HumanoidRootPart.CFrame = HumanoidRootPart.CFrame + moveDir.Unit * ((Flags.WalkSpeedValue or 3) / 145.5)
+		end
+	end, 0.05)
+
+	-- Hide name loop
+	startLoop("HideName", function()
+		if HumanoidRootPart then
+			local bb = HumanoidRootPart:FindFirstChild("CharacterBillboardGui")
+			if bb then bb.Enabled = not (Flags.HideName or false) end
+		end
+	end, 0.5)
+
+	table.insert(Connections, LocalPlayer.CharacterAdded:Connect(function(char)
+		task.wait(1)
+		Character = char
+		Humanoid = char:WaitForChild("Humanoid", 10)
+		HumanoidRootPart = char:WaitForChild("HumanoidRootPart", 10)
+		Backpack = LocalPlayer:WaitForChild("Backpack")
+	end))
+
+	notify("⚡ POTENT HUB", "✅ BloxSpin cargado!", 4)
+	print("[POTENT HUB] BloxSpin loaded")
 end
 
 -- ============================================================
@@ -2632,7 +3205,6 @@ local function runSpeedKeyboardEscape()
 		end
 	end
 
-	-- (Rutas RAW_W2 y RAW_W3 omitidas aquí por longitud, se mantienen igual que en el original)
 	local RAW_W2 = {
 		["150K"] = {
 			-397.56, 506.15, -51.07,  -401.05, 505.25, 62.40,  -402.06, 505.25, 127.12,
@@ -4523,8 +5095,8 @@ end
 local function launchGame()
 	if game.PlaceId == 114697347887839 or game.PlaceId == 72858062353423 then
 		runSpeedMonkeyEscape()
-	elseif game.PlaceId == 104715542330896 then
-		showMaintenanceScreen()
+	elseif game.PlaceId == BLOXSPIN_PLACE_ID then
+		runBloxSpin()
 	elseif game.PlaceId == 142823291 then
 		runMM2()
 	elseif game.PlaceId == 77813828595591 then
