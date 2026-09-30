@@ -8,7 +8,6 @@
 -- 6. One Tap (90568084448279)
 -- ============================================================
 
--- Check for table that is shared between executions.
 if not shared then
 	return warn("No shared, no script.")
 end
@@ -100,13 +99,9 @@ local BrandGradient = ColorSequence.new({
 local BACKGROUND_ID = "72427773287138"
 local LOGO_ID = "117299981730743"
 
--- State.
 local animGradients = {}
 local visualApplied = false
 
--- ============================================================
--- ========== UI UTILITIES ==========
--- ============================================================
 local function spinGradient(gradient, speed)
 	table.insert(animGradients, { g = gradient, s = speed or 40 })
 end
@@ -1306,1866 +1301,7 @@ local function runSpeedMonkeyEscape()
 end
 
 -- ============================================================
--- ========== JUEGO 2: BLOXSPIN ==========
--- ============================================================
-local function runBloxSpin()
-	local LocalPlayer = playersService.LocalPlayer
-
-	if not game:IsLoaded() then game.Loaded:Wait() end
-
-	local PlayerGui
-	repeat task.wait() PlayerGui = LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui") until PlayerGui
-	local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-	local Humanoid = Character:WaitForChild("Humanoid", 10)
-	local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart", 10)
-	local Backpack = LocalPlayer:WaitForChild("Backpack")
-	local Camera = workspaceService.CurrentCamera
-
-	-- Módulos del juego
-	local Networking, Data, Sprint, Ragdoll, Crate, Vehicle, CharModule
-	pcall(function()
-		Networking = replicatedStorage:WaitForChild("Modules", 10):WaitForChild("Core", 10):WaitForChild("Net", 10)
-	end)
-	pcall(function() CharModule = require(replicatedStorage.Modules.Core.Char) end)
-	pcall(function() Data = require(replicatedStorage.Modules.Core.Data) end)
-	pcall(function() Sprint = require(replicatedStorage.Modules.Game.Sprint) end)
-	pcall(function() Ragdoll = require(replicatedStorage.Modules.Game.Ragdoll) end)
-	pcall(function() Crate = require(replicatedStorage.Modules.Game.CrateSystem.Crate) end)
-	pcall(function() Vehicle = require(replicatedStorage.Modules.Game.VehicleSystem.Vehicle) end)
-
-	local DroppedItems = workspaceService:FindFirstChild("DroppedItems")
-	local Vehicles = workspaceService:FindFirstChild("Vehicles")
-
-	-- State
-	local Flags = {}
-	local Loops = {}
-	local Connections = {}
-
-	local function startLoop(id, fn, interval)
-		if Loops[id] then task.cancel(Loops[id]) Loops[id] = nil end
-		Flags[id] = true
-		Loops[id] = task.spawn(function()
-			while Flags[id] do
-				pcall(fn)
-				task.wait(interval or 0.1)
-			end
-			Loops[id] = nil
-		end)
-	end
-
-	local function stopLoop(id)
-		Flags[id] = false
-		if Loops[id] then task.cancel(Loops[id]) Loops[id] = nil end
-	end
-
-	local function getCharacter()
-		Character = LocalPlayer.Character
-		if not Character then return nil end
-		Humanoid = Character:FindFirstChildOfClass("Humanoid")
-		HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
-		return Character
-	end
-
-	local function distanceTo(target)
-		if not HumanoidRootPart then return math.huge end
-		if typeof(target) == "Instance" then
-			if target:IsA("BasePart") then
-				return (target.Position - HumanoidRootPart.Position).Magnitude
-			end
-			if target:IsA("Model") then
-				return (target:GetPivot().Position - HumanoidRootPart.Position).Magnitude
-			end
-		elseif typeof(target) == "Vector3" then
-			return (target - HumanoidRootPart.Position).Magnitude
-		end
-		return math.huge
-	end
-
-	local WindUI = getWindUILibrary()
-	local window = createPotentWindow(WindUI, "POTENTHUB_BLOXSPIN", "POTENT HUB - BloxSpin")
-
-	local function notify(title, content, duration)
-		pcall(function()
-			WindUI:Notify({ Title = title, Content = content, Duration = duration or 3 })
-		end)
-	end
-
-	local generalTab = window:Tab({ Title = "🏠 General", Icon = "house" })
-	local vehicleTab = window:Tab({ Title = "🚗 Vehicle", Icon = "car" })
-	local visualTab = window:Tab({ Title = "👁️ Visual", Icon = "eye" })
-	local pvpTab = window:Tab({ Title = "⚔️ PVP", Icon = "crosshair" })
-	local miscTab = window:Tab({ Title = "⚙️ Misc", Icon = "box" })
-
-	-- GENERAL TAB
-	generalTab:Section({ Title = "ℹ️ Info" })
-	generalTab:Paragraph({ Title = "Game", Desc = "BloxSpin" })
-	generalTab:Paragraph({ Title = "PlaceId", Desc = tostring(game.PlaceId) })
-
-	local bankPara = generalTab:Paragraph({ Title = "🏦 Bank", Desc = "$0" })
-	local handPara = generalTab:Paragraph({ Title = "💵 Cash", Desc = "$0" })
-
-	task.spawn(function()
-		while true do
-			task.wait(1)
-			pcall(function()
-				if Data and Data.money then
-					bankPara:SetDesc("$" .. tostring(Data.money.bank or 0))
-					handPara:SetDesc("$" .. tostring(Data.money.hand or 0))
-				end
-			end)
-		end
-	end)
-
-	generalTab:Section({ Title = "🏃 Humanoid" })
-	generalTab:Toggle({
-		Title = "Speed Custom",
-		Desc = "Custom walk speed",
-		Value = false,
-		Callback = function(state)
-			Flags.WalkSpeedCustom = state
-			Flags.WalkSpeedLoop = state
-		end,
-	})
-	generalTab:Slider({
-		Title = "Speed Value",
-		Step = 0.1,
-		Value = { Min = 1, Max = 3.5, Default = 1 },
-		Callback = function(v) Flags.WalkSpeedValue = v end,
-	})
-	generalTab:Toggle({
-		Title = "Jump Custom",
-		Desc = "Custom jump power",
-		Value = false,
-		Callback = function(state) Flags.JumpPowerCustom = state end,
-	})
-	generalTab:Slider({
-		Title = "Jump Value",
-		Step = 1,
-		Value = { Min = 1, Max = 25, Default = 10 },
-		Callback = function(v) Flags.JumpPowerValue = v end,
-	})
-
-	generalTab:Section({ Title = "⛏️ Underground" })
-	generalTab:Toggle({
-		Title = "Snap Underground",
-		Desc = "Enable underground snap",
-		Value = false,
-		Callback = function(state)
-			Flags.Snap = state
-			if state then startLoop("Snap", function()
-				if getCharacter() and HumanoidRootPart then
-					local snapY = Flags.SnapBaseY
-					if not snapY then
-						snapY = HumanoidRootPart.Position.Y
-						Flags.SnapBaseY = snapY
-					end
-					local targetY = snapY - (Flags.SnapAmount or 10)
-					local diff = targetY - HumanoidRootPart.Position.Y
-					Character:PivotTo(HumanoidRootPart.CFrame * CFrame.new(0, diff, 0))
-				end
-			end, 0.05)
-			else
-				Flags.SnapBaseY = nil
-				stopLoop("Snap")
-			end
-		end,
-	})
-	generalTab:Slider({
-		Title = "Snap Amount",
-		Step = 1,
-		Value = { Min = 1, Max = 150, Default = 10 },
-		Callback = function(v) Flags.SnapAmount = v end,
-	})
-
-	generalTab:Section({ Title = "📦 Item Grabber" })
-	generalTab:Toggle({
-		Title = "Item Dropped Grabber",
-		Desc = "Auto grab dropped items",
-		Value = false,
-		Callback = function(state)
-			Flags.ItemDroppedGraber = state
-			if state then startLoop("ItemGrab", function()
-				if not Networking or not DroppedItems then return end
-				for _, item in ipairs(DroppedItems:GetChildren()) do
-					if item:IsA("Model") and item:FindFirstChild("PickUpZone") and distanceTo(item) < 15 then
-						pcall(function() Networking:Get("pickup_dropped_item", item) end)
-					end
-				end
-			end, 0.3)
-			else stopLoop("ItemGrab") end
-		end,
-	})
-
-	generalTab:Section({ Title = "⚙️ Etc" })
-	generalTab:Toggle({
-		Title = "Infinite Stamina",
-		Desc = "Unlimited stamina",
-		Value = false,
-		Callback = function(state) Flags.InfStamina = state end,
-	})
-	generalTab:Toggle({
-		Title = "Auto Respawn",
-		Desc = "Auto respawn on death",
-		Value = false,
-		Callback = function(state)
-			Flags.AutoRespawn = state
-			if state then startLoop("AutoRespawn", function()
-				if not Networking then return end
-				local ds = PlayerGui:FindFirstChild("DeathScreen")
-				ds = ds and ds:FindFirstChild("DeathScreenHolder")
-				if not ds or not ds.Visible then return end
-				local frame = ds.Frame
-				frame = frame and frame:FindFirstChild("RespawnButtonFrame")
-				frame = frame and frame:FindFirstChild("RespawnButton")
-				frame = frame and frame:FindFirstChild("TextLabel")
-				if frame and frame.Text == "Respawn" then
-					Networking:FireServer("death_screen_request_respawn")
-				end
-			end, 1)
-			else stopLoop("AutoRespawn") end
-		end,
-	})
-	generalTab:Toggle({
-		Title = "Hide Name",
-		Desc = "Hide your own name",
-		Value = false,
-		Callback = function(state)
-			Flags.HideName = state
-			if HumanoidRootPart then
-				local bb = HumanoidRootPart:FindFirstChild("CharacterBillboardGui")
-				if bb then bb.Enabled = not state end
-			end
-		end,
-	})
-	generalTab:Toggle({
-		Title = "Anti Ragdoll",
-		Desc = "Prevent ragdoll",
-		Value = false,
-		Callback = function(state) Flags.AntiRagdoll = state end,
-	})
-	generalTab:Toggle({
-		Title = "Anti Aim Assist",
-		Desc = "Prevent aim assist locks",
-		Value = false,
-		Callback = function(state)
-			Flags.AntiAimAssiant = state
-			if state then startLoop("AntiAim", function()
-				if not CharModule then return end
-				local hum = CharModule.get_hum()
-				if hum and not hum:GetAttribute("HasBeenDowned") then
-					local hrp = CharModule.get_hrp()
-					if hrp then
-						local v, av, aav = hrp.Velocity, hrp.AssemblyLinearVelocity, hrp.AssemblyAngularVelocity
-						hrp.Velocity = Vector3.new(math.random(-99999, 99999), math.random(-99999, 99999), math.random(-99999, 99999))
-						hrp.AssemblyLinearVelocity = hrp.Velocity
-						hrp.AssemblyAngularVelocity = hrp.Velocity
-						runService.RenderStepped:Wait()
-						hrp.Velocity, hrp.AssemblyLinearVelocity, hrp.AssemblyAngularVelocity = v, av, aav
-					end
-				end
-			end, 0.05)
-			else stopLoop("AntiAim") end
-		end,
-	})
-
-	-- VEHICLE TAB
-	vehicleTab:Section({ Title = "🚗 Vehicle Settings" })
-	vehicleTab:Toggle({
-		Title = "Speed Boost Vehicle",
-		Desc = "Boost vehicle speed",
-		Value = false,
-		Callback = function(state)
-			Flags.SpeedBostVehicle = state
-			if state then startLoop("VehicleBoost", function()
-				if not Vehicle then return end
-				local car = Vehicle.get_car_player_is_in()
-				if car and car.PrimaryPart then
-					local vel = car.PrimaryPart.AssemblyLinearVelocity
-					local look = car.PrimaryPart.CFrame.LookVector
-					if vel.Magnitude > 0 then
-						local boost = look * (Flags.VehicleSpeedBost or 45)
-						car.PrimaryPart.AssemblyLinearVelocity = Vector3.new(boost.X, vel.Y, boost.Z)
-					end
-				end
-			end, 0.05)
-			else stopLoop("VehicleBoost") end
-		end,
-	})
-	vehicleTab:Slider({
-		Title = "Vehicle Speed",
-		Step = 1,
-		Value = { Min = 20, Max = 80, Default = 45 },
-		Callback = function(v) Flags.VehicleSpeedBost = v end,
-	})
-
-	vehicleTab:Section({ Title = "🚙 Vehicle Actions" })
-	vehicleTab:Button({
-		Title = "Pull Your Vehicle",
-		Desc = "Pull your vehicle to you",
-		Callback = function()
-			if not Vehicles then notify("Vehicle", "Vehicles not found", 3) return end
-			for _, v in ipairs(Vehicles:GetChildren()) do
-				if v:IsA("Model") and v:GetAttribute("OwnerUserId") == LocalPlayer.UserId then
-					v:PivotTo(HumanoidRootPart.CFrame * CFrame.new(0, 5, -5))
-					notify("Vehicle", "Vehicle pulled", 2)
-					return
-				end
-			end
-			notify("Vehicle", "No vehicle found", 3)
-		end,
-	})
-	vehicleTab:Button({
-		Title = "Crash Current Vehicle",
-		Desc = "Explode the vehicle you're in",
-		Callback = function()
-			if not Networking or not Vehicle then notify("Vehicle", "Not available", 3) return end
-			local car = Vehicle.get_car_player_is_in()
-			if not car then notify("Vehicle", "Not in a vehicle", 3) return end
-			for i = 1, 15 do
-				Networking:FireServer("crashed_car", car, 150)
-			end
-			notify("Vehicle", "Vehicle crashed", 2)
-		end,
-	})
-
-	-- VISUAL TAB
-	local ESPData = {}
-	local function createDrawing(class, props)
-		if not Drawing then return nil end
-		local d = Drawing.new(class)
-		for k, v in pairs(props or {}) do d[k] = v end
-		return d
-	end
-
-	local function worldToViewport(pos)
-		local v3 = typeof(pos) == "Vector3" and pos or pos.Position
-		local sp, onScreen = Camera:WorldToViewportPoint(v3)
-		return Vector2.new(sp.X, sp.Y), onScreen, sp.Z
-	end
-
-	local function setupESPForPlayer(plr)
-		if plr == LocalPlayer or ESPData[plr] then return end
-		if not Drawing then return end
-		ESPData[plr] = {
-			Box = createDrawing("Square", { Visible = false, Color = Color3.fromRGB(201, 12, 204), Thickness = 1, Filled = false }),
-			Name = createDrawing("Text", { Visible = false, Color = Color3.new(1,1,1), Size = 15, Center = true, Outline = true, Text = plr.Name }),
-			Distance = createDrawing("Text", { Visible = false, Color = Color3.new(1,1,1), Size = 15, Center = true, Outline = true, Text = "" }),
-			HPBar = createDrawing("Line", { Visible = false, Color = Color3.new(0,1,0), Thickness = 2 }),
-		}
-	end
-
-	local function removeESPForPlayer(plr)
-		if not ESPData[plr] then return end
-		for _, d in pairs(ESPData[plr]) do
-			pcall(function() d:Remove() end)
-		end
-		ESPData[plr] = nil
-	end
-
-	if Drawing then
-		for _, plr in ipairs(playersService:GetPlayers()) do setupESPForPlayer(plr) end
-		table.insert(Connections, playersService.PlayerAdded:Connect(setupESPForPlayer))
-		table.insert(Connections, playersService.PlayerRemoving:Connect(removeESPForPlayer))
-
-		startLoop("ESP", function()
-			if not Camera then return end
-			for plr, data in pairs(ESPData) do
-				local char = plr.Character
-				local hum = char and char:FindFirstChildOfClass("Humanoid")
-				local hrp = char and char:FindFirstChild("HumanoidRootPart")
-				local head = char and char:FindFirstChild("Head")
-				if not (char and hum and hrp and head and hum.Health > 0) then
-					for _, d in pairs(data) do d.Visible = false end
-					continue
-				end
-				local sp, onScreen = worldToViewport(hrp.Position)
-				if not onScreen then
-					for _, d in pairs(data) do d.Visible = false end
-					continue
-				end
-				local headSP = worldToViewport(head.Position + Vector3.new(0, 0.5, 0))
-				local feetSP = worldToViewport(hrp.Position - Vector3.new(0, 3, 0))
-				local boxH = headSP.Y - feetSP.Y
-				local boxW = 1000 / sp.Z
-				data.Box.Size = Vector2.new(boxW, boxH)
-				data.Box.Position = Vector2.new(sp.X - boxW / 2, sp.Y - boxH / 2)
-				data.Box.Visible = Flags.BoxPlayerVisual or false
-				data.Name.Position = Vector2.new(headSP.X, headSP.Y - 20)
-				data.Name.Visible = Flags.NamePlayerVisual or false
-				data.Distance.Position = Vector2.new(headSP.X, feetSP.Y + 5)
-				data.Distance.Text = "[" .. math.floor((hrp.Position - HumanoidRootPart.Position).Magnitude) .. "m]"
-				data.Distance.Visible = Flags.DistancePlayerVisual or false
-				local hpRatio = hum.Health / hum.MaxHealth
-				data.HPBar.From = Vector2.new(data.Box.Position.X + boxW + 5, data.Box.Position.Y + boxH * (1 - hpRatio))
-				data.HPBar.To = Vector2.new(data.Box.Position.X + boxW + 5, data.Box.Position.Y + boxH)
-				data.HPBar.Color = Color3.new(1 - hpRatio, hpRatio, 0)
-				data.HPBar.Visible = Flags.HealthPlayerVisual or false
-			end
-		end, 0.05)
-	end
-
-	visualTab:Section({ Title = "👁️ Player Visual" })
-	visualTab:Toggle({ Title = "ESP Name", Desc = "Show player names", Value = false, Callback = function(s) Flags.NamePlayerVisual = s end })
-	visualTab:Toggle({ Title = "ESP Box", Desc = "Show player boxes", Value = false, Callback = function(s) Flags.BoxPlayerVisual = s end })
-	visualTab:Toggle({ Title = "ESP Health", Desc = "Show player health", Value = false, Callback = function(s) Flags.HealthPlayerVisual = s end })
-	visualTab:Toggle({ Title = "ESP Distance", Desc = "Show player distance", Value = false, Callback = function(s) Flags.DistancePlayerVisual = s end })
-	visualTab:Toggle({ Title = "ESP Inventory", Desc = "Show player inventory", Value = false, Callback = function(s) Flags.InventoryPlayerVisual = s end })
-
-	visualTab:Section({ Title = "📦 Item Drop Visual" })
-	visualTab:Toggle({ Title = "Show Item Drop", Desc = "Show dropped items", Value = false, Callback = function(s) Flags.ItemDropVisual = s end })
-	visualTab:Dropdown({
-		Title = "Blacklist Rarity",
-		Values = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Omega"},
-		Value = "Common",
-		Callback = function(v) Flags.BlacklistRarity = v end,
-	})
-
-	visualTab:Section({ Title = "🚀 Performance" })
-	visualTab:Button({
-		Title = "Low Quality Mode",
-		Desc = "Reduce visual quality for FPS",
-		Callback = function()
-			pcall(function()
-				lighting.FogEnd = 10000000000
-				lighting.FogStart = 10000000000
-				lighting.Brightness = 1.2
-				lighting.GlobalShadows = false
-				lighting.EnvironmentDiffuseScale = 0.5
-				lighting.EnvironmentSpecularScale = 0.3
-				lighting.ShadowSoftness = 0
-				for _, effect in ipairs(lighting:GetChildren()) do
-					if effect:IsA("BloomEffect") then effect.Intensity = 0.2 end
-					if effect:IsA("BlurEffect") then effect.Size = 0 end
-					if effect:IsA("SunRaysEffect") then effect.Intensity = 0.1 end
-					if effect:IsA("ColorCorrectionEffect") then effect.Saturation = 0.7 end
-				end
-				for _, part in ipairs(workspaceService:GetDescendants()) do
-					if part:IsA("BasePart") then
-						part.Material = Enum.Material.SmoothPlastic
-						part.CastShadow = false
-						part.Reflectance = 0
-					end
-				end
-				if setfpscap then pcall(setfpscap, 240) end
-			end)
-			notify("Performance", "Low quality mode enabled", 3)
-		end,
-	})
-
-	-- PVP TAB
-	local AimTarget = nil
-	local PovCircle = Drawing and Drawing.new("Circle") or nil
-	if PovCircle then
-		PovCircle.Visible = false
-		PovCircle.Color = Color3.new(1, 1, 1)
-		PovCircle.Thickness = 1
-		PovCircle.Filled = false
-		PovCircle.NumSides = 64
-	end
-
-	local function findAimTarget()
-		if not HumanoidRootPart or not Camera then return nil end
-		local best, bestDist = nil, math.huge
-		local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-		for _, plr in ipairs(playersService:GetPlayers()) do
-			if plr ~= LocalPlayer and plr.Character then
-				local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-				local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
-				if hum and hrp and hum.Health > 0 then
-					if not plr:GetAttribute("IsSafeZoneProtected") and not plr.Character:GetAttribute("IsSpawnProtected") then
-						if not (Flags.FriendIngore and plr:IsFriendsWith(LocalPlayer.UserId)) then
-							local sp, onScreen = worldToViewport(hrp.Position)
-							if onScreen then
-								local d = (sp - center).Magnitude
-								if d <= (Flags.PovSize or 250) and d < bestDist then
-									best, bestDist = plr, d
-								end
-							end
-						end
-					end
-				end
-			end
-		end
-		return best
-	end
-
-	if PovCircle then
-		startLoop("AimAssist", function()
-			if not Camera then return end
-			PovCircle.Radius = Flags.PovSize or 250
-			PovCircle.Visible = Flags.AimAssiant or false
-			PovCircle.Color = Flags.RainbowPov and Color3.fromHSV(tick() % 5 / 5, 1, 1) or Color3.new(1, 1, 1)
-			PovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-			if Flags.AimAssiant then
-				AimTarget = findAimTarget()
-			else
-				AimTarget = nil
-			end
-		end, 0.05)
-	end
-
-	pvpTab:Section({ Title = "🎯 PVP Settings" })
-	pvpTab:Toggle({ Title = "Aim Assist", Desc = "Aim assist lock", Value = false, Callback = function(s) Flags.AimAssiant = s end })
-	pvpTab:Toggle({ Title = "Wall Bang", Desc = "Shoot through walls", Value = false, Callback = function(s) Flags.WallBang = s end })
-	pvpTab:Toggle({ Title = "Multi Shoot", Desc = "Shoot x2 per bullet", Value = false, Callback = function(s) Flags.MultiShoot = s end })
-	pvpTab:Toggle({ Title = "Ignore Friends", Desc = "Skip friends in aim assist", Value = false, Callback = function(s) Flags.FriendIngore = s end })
-	pvpTab:Toggle({ Title = "Rainbow POV", Desc = "Rainbow circle", Value = false, Callback = function(s) Flags.RainbowPov = s end })
-	pvpTab:Dropdown({
-		Title = "Target Part",
-		Values = {"Head", "HumanoidRootPart"},
-		Value = "Head",
-		Callback = function(v) Flags.PartTargetSelected = v end,
-	})
-	pvpTab:Slider({
-		Title = "POV Size",
-		Step = 1,
-		Value = { Min = 150, Max = 800, Default = 250 },
-		Callback = function(v) Flags.PovSize = v end,
-	})
-
-	pvpTab:Section({ Title = "🔫 Gun Customization" })
-	pvpTab:Toggle({ Title = "Automatic Mode", Desc = "Auto fire mode", Value = false, Callback = function(s) Flags.AutomaticGun = s end })
-	pvpTab:Slider({ Title = "Fire Rate", Step = 1, Value = { Min = 100, Max = 3000, Default = 1000 }, Callback = function(v) Flags.FireRateGun = v end })
-	pvpTab:Slider({ Title = "Recoil", Step = 0.1, Value = { Min = 0, Max = 10, Default = 0 }, Callback = function(v) Flags.RecoilGun = v end })
-	pvpTab:Slider({ Title = "Accuracy", Step = 0.01, Value = { Min = 0, Max = 1, Default = 1 }, Callback = function(v) Flags.AccuracyGun = v end })
-	pvpTab:Slider({ Title = "Durability", Step = 1, Value = { Min = 100, Max = 3000, Default = 1000 }, Callback = function(v) Flags.DurabilityGun = v end })
-	pvpTab:Button({
-		Title = "Apply Gun Settings",
-		Desc = "Apply to currently held gun",
-		Callback = function()
-			if not Character then return end
-			local tool = Character:FindFirstChildWhichIsA("Tool")
-			if not tool then notify("Gun", "No gun equipped", 3) return end
-			pcall(function()
-				local gunFolder = replicatedStorage:FindFirstChild("Items")
-				gunFolder = gunFolder and gunFolder:FindFirstChild("gun")
-				if not gunFolder then return end
-				for _, gun in ipairs(gunFolder:GetChildren()) do
-					if tool.Name == gun.Name then
-						tool:SetAttribute("fire_rate", Flags.FireRateGun or tool:GetAttribute("fire_rate"))
-						tool:SetAttribute("accuracy", Flags.AccuracyGun or tool:GetAttribute("accuracy"))
-						tool:SetAttribute("Recoil", Flags.RecoilGun or tool:GetAttribute("Recoil"))
-						tool:SetAttribute("Durability", Flags.DurabilityGun or tool:GetAttribute("Durability"))
-						tool:SetAttribute("automatic", Flags.AutomaticGun or tool:GetAttribute("automatic"))
-						notify("Gun", "Settings applied", 2)
-					end
-				end
-			end)
-		end,
-	})
-
-	-- MISC TAB
-	miscTab:Section({ Title = "🎁 Crate & Quest" })
-	miscTab:Button({
-		Title = "Skip Crate Spin",
-		Desc = "Skip crate spin animation",
-		Callback = function()
-			if not Crate then notify("Crate", "Not available", 3) return end
-			pcall(function()
-				if Crate.spinning and Crate.spinning.get() then return end
-				Crate.skip_spin()
-				notify("Crate", "Spin skipped", 2)
-			end)
-		end,
-	})
-	miscTab:Button({
-		Title = "Claim All Quests",
-		Desc = "Claim all quests at once",
-		Callback = function()
-			if not Networking then return end
-			pcall(function()
-				local quests = PlayerGui:FindFirstChild("Quests")
-				if not quests then return end
-				local holder = quests:FindFirstChild("QuestsHolder")
-				if not holder then return end
-				local frame = holder:FindFirstChild("QuestsScrollingFrame")
-				if not frame then return end
-				for _, v in ipairs(frame:GetChildren()) do
-					if v:IsA("Frame") or v:IsA("TextButton") or v:IsA("ImageButton") then
-						Networking:Get("claim_quest", v.Name)
-					end
-				end
-				notify("Quests", "All quests claimed", 2)
-			end)
-		end,
-	})
-
-	miscTab:Section({ Title = "🗑️ Unload" })
-	miscTab:Button({
-		Title = "Unload GUI",
-		Desc = "Unload the script",
-		Callback = function()
-			for _, conn in ipairs(Connections) do pcall(function() conn:Disconnect() end) end
-			for id in pairs(Loops) do stopLoop(id) end
-			pcall(function() window:Destroy() end)
-		end,
-	})
-
-	-- Anti Ragdoll hook
-	if Ragdoll and Ragdoll.is_ragdolling and Ragdoll.is_ragdolling.get then
-		local origGet = Ragdoll.is_ragdolling.get
-		Ragdoll.is_ragdolling.get = function(...)
-			local r = origGet(...)
-			if r == true and Flags.AntiRagdoll and Networking then
-				pcall(function()
-					Ragdoll.is_ragdolling.set(false)
-					Networking:FireServer("end_ragdoll_early")
-					Networking:FireServer("clear_ragdoll")
-				end)
-			end
-			return r
-		end
-	end
-
-	-- Inf Stamina hook
-	pcall(function()
-		if Sprint and Sprint.consume_stamina then
-			local bar = debug.getupvalue(Sprint.consume_stamina, 2).sprint_bar
-			if bar and bar.update then
-				local origUpdate = bar.update
-				bar.update = function(...)
-					if Flags.InfStamina then return function() return 1 end end
-					return origUpdate(...)
-				end
-			end
-		end
-	end)
-
-	-- Humanoid loop
-	startLoop("Humanoid", function()
-		getCharacter()
-		if not Humanoid or not HumanoidRootPart then return end
-		if Flags.JumpPowerCustom then
-			Humanoid.JumpHeight = Flags.JumpPowerValue or 3.89
-		else
-			Humanoid.JumpHeight = 3.89
-		end
-		local moveDir = Humanoid.MoveDirection
-		if moveDir.Magnitude > 0 and Flags.WalkSpeedCustom then
-			pcall(function()
-				if Networking then Networking:FireServer("set_sprinting_1", true) end
-			end)
-			if Humanoid:GetAttribute("TargetWalkSpeed") ~= 30 and Humanoid.WalkSpeed ~= 30 then
-				Humanoid:SetAttribute("TargetWalkSpeed", 30)
-				Humanoid.WalkSpeed = 30
-			end
-			HumanoidRootPart.CFrame = HumanoidRootPart.CFrame + moveDir.Unit * ((Flags.WalkSpeedValue or 3) / 145.5)
-		end
-	end, 0.05)
-
-	-- Hide name loop
-	startLoop("HideName", function()
-		if HumanoidRootPart then
-			local bb = HumanoidRootPart:FindFirstChild("CharacterBillboardGui")
-			if bb then bb.Enabled = not (Flags.HideName or false) end
-		end
-	end, 0.5)
-
-	table.insert(Connections, LocalPlayer.CharacterAdded:Connect(function(char)
-		task.wait(1)
-		Character = char
-		Humanoid = char:WaitForChild("Humanoid", 10)
-		HumanoidRootPart = char:WaitForChild("HumanoidRootPart", 10)
-		Backpack = LocalPlayer:WaitForChild("Backpack")
-	end))
-
-	notify("⚡ POTENT HUB", "✅ BloxSpin cargado!", 4)
-	print("[POTENT HUB] BloxSpin loaded")
-end
-
--- ============================================================
--- ========== JUEGO 3: MURDER MYSTERY 2 ==========
--- ============================================================
-local function runMM2()
-	local CONFIG_FILE = "potent_hub_mm2_config.json"
-
-	local function loadConfig()
-		if not isfile or not readfile or not isfile(CONFIG_FILE) then return {} end
-		local ok, data = pcall(function() return httpService:JSONDecode(readfile(CONFIG_FILE)) end)
-		if ok and type(data) == "table" then
-			local defaults = {
-				espAll = false, espGun = false,
-				killAura = false, killAuraRange = 15,
-				autoShoot = false, autoGrabGun = false,
-				autoKnifeThrow = false,
-				notifyMurderer = false, notifySheriff = false,
-				gunSilentAim = false,
-				hitboxExpand = false, hitboxSize = 4, hitboxVisible = false,
-				instantRole = false,
-				antiSilentAim = false,
-				autoFarmCoins = false,
-				godmode = false,
-				speedEnabled = false, speedValue = 20,
-				jumpEnabled = false, jumpValue = 50,
-				noclipEnabled = false,
-			}
-			for key, default in pairs(defaults) do
-				if data[key] == nil then data[key] = default end
-			end
-			return data
-		end
-		return {}
-	end
-	local function saveConfig(tbl)
-		if not writefile then return end
-		pcall(function() writefile(CONFIG_FILE, httpService:JSONEncode(tbl)) end)
-	end
-	local savedConfig = loadConfig()
-
-	local localPlayer = playersService.LocalPlayer
-	local flags = {
-		espAll = savedConfig.espAll == true,
-		espGun = savedConfig.espGun == true,
-		killAura = savedConfig.killAura == true,
-		killAuraRange = savedConfig.killAuraRange or 15,
-		autoShoot = savedConfig.autoShoot == true,
-		autoGrabGun = savedConfig.autoGrabGun == true,
-		autoKnifeThrow = savedConfig.autoKnifeThrow == true,
-		notifyMurderer = savedConfig.notifyMurderer == true,
-		notifySheriff = savedConfig.notifySheriff == true,
-		gunSilentAim = savedConfig.gunSilentAim == true,
-		hitboxExpand = savedConfig.hitboxExpand == true,
-		hitboxSize = savedConfig.hitboxSize or 4,
-		hitboxVisible = savedConfig.hitboxVisible == true,
-		instantRole = savedConfig.instantRole == true,
-		antiSilentAim = savedConfig.antiSilentAim == true,
-		autoFarmCoins = savedConfig.autoFarmCoins == true,
-		godmode = savedConfig.godmode == true,
-		speedEnabled = savedConfig.speedEnabled == true,
-		speedValue = savedConfig.speedValue or 20,
-		jumpEnabled = savedConfig.jumpEnabled == true,
-		jumpValue = savedConfig.jumpValue or 50,
-		noclipEnabled = savedConfig.noclipEnabled == true,
-	}
-	local function saveAll()
-		saveConfig({
-			espAll = flags.espAll, espGun = flags.espGun,
-			killAura = flags.killAura, killAuraRange = flags.killAuraRange,
-			autoShoot = flags.autoShoot, autoGrabGun = flags.autoGrabGun,
-			autoKnifeThrow = flags.autoKnifeThrow,
-			notifyMurderer = flags.notifyMurderer, notifySheriff = flags.notifySheriff,
-			gunSilentAim = flags.gunSilentAim,
-			hitboxExpand = flags.hitboxExpand, hitboxSize = flags.hitboxSize,
-			hitboxVisible = flags.hitboxVisible,
-			instantRole = flags.instantRole,
-			antiSilentAim = flags.antiSilentAim,
-			autoFarmCoins = flags.autoFarmCoins,
-			godmode = flags.godmode,
-			speedEnabled = flags.speedEnabled, speedValue = flags.speedValue,
-			jumpEnabled = flags.jumpEnabled, jumpValue = flags.jumpValue,
-			noclipEnabled = flags.noclipEnabled,
-		})
-	end
-
-	local highlights = {}
-	local tagCache = {}
-	local gunEsp = {}
-	local autoFarmRunning, autoFarmThread = false, nil
-	local hitboxOriginal = {}
-	local godmodeConnection = nil
-
-	localPlayer.Idled:Connect(function()
-		virtualUser:CaptureController()
-		virtualUser:ClickButton2(Vector2.new())
-	end)
-
-	local function getRoot(player)
-		local char = player and player.Character
-		return char and char:FindFirstChild("HumanoidRootPart")
-	end
-	local function getHumanoid(player)
-		local char = player and player.Character
-		return char and char:FindFirstChildOfClass("Humanoid")
-	end
-	local function hasTool(player, search)
-		local char = player.Character
-		if char then
-			for _, v in ipairs(char:GetDescendants()) do
-				if v:IsA("Tool") and string.find(string.lower(v.Name), search) then return true end
-			end
-		end
-		local backpack = player:FindFirstChild("Backpack")
-		if backpack then
-			for _, v in ipairs(backpack:GetChildren()) do
-				if v:IsA("Tool") and string.find(string.lower(v.Name), search) then return true end
-			end
-		end
-		return false
-	end
-	local function getPlayerRole(player)
-		if not player.Character then return nil end
-		if hasTool(player, "knife") then return "Murderer"
-		elseif hasTool(player, "gun") or hasTool(player, "revolver") then return "Sheriff" end
-		return "Innocent"
-	end
-	local function findMurderer()
-		for _, plr in ipairs(playersService:GetPlayers()) do
-			if plr ~= localPlayer then
-				local bp = plr:FindFirstChild("Backpack")
-				if bp and bp:FindFirstChild("Knife") then return plr end
-				if plr.Character and plr.Character:FindFirstChild("Knife") then return plr end
-			end
-		end
-		return nil
-	end
-	local function findSheriff()
-		for _, plr in ipairs(playersService:GetPlayers()) do
-			if plr ~= localPlayer then
-				local bp = plr:FindFirstChild("Backpack")
-				if bp and bp:FindFirstChild("Gun") then return plr end
-				if plr.Character and plr.Character:FindFirstChild("Gun") then return plr end
-			end
-		end
-		return nil
-	end
-	local function findMap()
-		for _, o in ipairs(workspaceService:GetChildren()) do
-			if o:FindFirstChild("CoinContainer") and o:FindFirstChild("Spawns") then return o end
-		end
-		return nil
-	end
-	local function removeHighlight(player)
-		if highlights[player] then
-			pcall(highlights[player].Destroy, highlights[player])
-			highlights[player] = nil
-		end
-	end
-	local function removeTag(player)
-		if tagCache[player] then
-			pcall(tagCache[player].Destroy, tagCache[player])
-			tagCache[player] = nil
-		end
-	end
-	local function createRoleTag(player, role)
-		local char = player.Character
-		if not char then return end
-		local head = char:FindFirstChild("Head")
-		if not head then return end
-		removeTag(player)
-		if role ~= "Murderer" and role ~= "Sheriff" then return end
-		local colors = { Murderer = Color3.fromRGB(255, 0, 0), Sheriff = Color3.fromRGB(0, 100, 255) }
-		local emojis = { Murderer = "🔪", Sheriff = "🔫" }
-		local billboard = Instance.new("BillboardGui")
-		billboard.Name = "POTENT_ROLE_TAG"
-		billboard.Size = UDim2.new(0, 180, 0, 35)
-		billboard.StudsOffset = Vector3.new(0, 2.8, 0)
-		billboard.AlwaysOnTop = true
-		billboard.Parent = head
-		local bg = Instance.new("Frame")
-		bg.Size = UDim2.new(1, 0, 1, 0)
-		bg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-		bg.BackgroundTransparency = 0.6
-		bg.Parent = billboard
-		local text = Instance.new("TextLabel")
-		text.Size = UDim2.new(1, 0, 1, 0)
-		text.BackgroundTransparency = 1
-		text.Text = emojis[role] .. " " .. role
-		text.TextColor3 = colors[role]
-		text.TextScaled = true
-		text.Font = Enum.Font.GothamBold
-		text.Parent = bg
-		tagCache[player] = billboard
-	end
-	local function updateESP()
-		for player, _ in pairs(highlights) do
-			if not player or not player.Parent then removeHighlight(player) removeTag(player) end
-		end
-		if not flags.espAll then
-			for player, _ in pairs(highlights) do removeHighlight(player) removeTag(player) end
-			return
-		end
-		for _, player in ipairs(playersService:GetPlayers()) do
-			if player == localPlayer then removeHighlight(player) removeTag(player) continue end
-			local role = getPlayerRole(player)
-			local hl = highlights[player] or Instance.new("Highlight")
-			hl.Name = "POTENT_ESP"
-			hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-			hl.FillTransparency = 0.4
-			hl.OutlineTransparency = 0
-			if role == "Murderer" then
-				hl.FillColor = Color3.fromRGB(255, 0, 0)
-				hl.OutlineColor = Color3.fromRGB(255, 0, 0)
-				hl.Adornee = player.Character
-				hl.Parent = player.Character
-				hl.Enabled = true
-				highlights[player] = hl
-				createRoleTag(player, "Murderer")
-			elseif role == "Sheriff" then
-				hl.FillColor = Color3.fromRGB(0, 100, 255)
-				hl.OutlineColor = Color3.fromRGB(0, 100, 255)
-				hl.Adornee = player.Character
-				hl.Parent = player.Character
-				hl.Enabled = true
-				highlights[player] = hl
-				createRoleTag(player, "Sheriff")
-			elseif role == "Innocent" then
-				hl.FillColor = Color3.fromRGB(0, 255, 0)
-				hl.OutlineColor = Color3.fromRGB(0, 255, 0)
-				hl.Adornee = player.Character
-				hl.Parent = player.Character
-				hl.Enabled = true
-				highlights[player] = hl
-				removeTag(player)
-			else
-				removeHighlight(player)
-				removeTag(player)
-			end
-		end
-	end
-	local function updateGunESP()
-		for obj, hl in pairs(gunEsp) do
-			if not obj or not obj.Parent then pcall(hl.Destroy, hl) gunEsp[obj] = nil end
-		end
-		if not flags.espGun then
-			for obj, hl in pairs(gunEsp) do pcall(hl.Destroy, hl) gunEsp[obj] = nil end
-			return
-		end
-		for _, desc in ipairs(workspaceService:GetDescendants()) do
-			if desc.Name == "GunDrop" and desc:IsA("BasePart") and not gunEsp[desc] then
-				local hl = Instance.new("Highlight")
-				hl.Name = "POTENT_GunHighlight"
-				hl.Adornee = desc
-				hl.FillColor = Color3.fromRGB(0, 255, 255)
-				hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-				hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-				hl.Parent = desc
-				gunEsp[desc] = hl
-			end
-		end
-	end
-	task.spawn(function() while true do pcall(updateESP) task.wait(0.2) end end)
-	task.spawn(function() while true do pcall(updateGunESP) task.wait(0.5) end end)
-
-	local function applyGodmode(state)
-		if godmodeConnection then pcall(godmodeConnection.Disconnect, godmodeConnection) godmodeConnection = nil end
-		if state then
-			local function setupGodmode(character)
-				local humanoid = character:FindFirstChildOfClass("Humanoid")
-				if humanoid then
-					godmodeConnection = humanoid.HealthChanged:Connect(function(newHealth)
-						if flags.godmode and newHealth < humanoid.MaxHealth then
-							humanoid.Health = humanoid.MaxHealth
-						end
-					end)
-				end
-			end
-			if localPlayer.Character then setupGodmode(localPlayer.Character) end
-		end
-	end
-	local function coinsReach(state)
-		for _, obj in pairs(workspaceService:GetDescendants()) do
-			if obj.Name == "Coin_Server" and obj:IsA("BasePart") then
-				if not hitboxOriginal[obj] then hitboxOriginal[obj] = obj.Size end
-				if state then obj.Size = hitboxOriginal[obj] * 4
-				else obj.Size = hitboxOriginal[obj] end
-			end
-		end
-	end
-	local function findCoinContainer()
-		local map = findMap()
-		if map then return map:FindFirstChild("CoinContainer") or map:FindFirstChild("Coins") end
-		return nil
-	end
-	local function getNearestCoin()
-		local container = findCoinContainer()
-		if not container then return nil end
-		local root = getRoot(localPlayer)
-		if not root then return nil end
-		local nearest, nearestDist = nil, math.huge
-		for _, coin in ipairs(container:GetChildren()) do
-			if coin:IsA("BasePart") then
-				local visual = coin:FindFirstChild("CoinVisual")
-				if visual and not visual:GetAttribute("Collected") then
-					local dist = (root.Position - coin.Position).Magnitude
-					if dist < nearestDist then nearestDist = dist nearest = coin end
-				end
-			end
-		end
-		return nearest
-	end
-	local function autoFarmLoop()
-		while flags.autoFarmCoins and autoFarmRunning do
-			local root = getRoot(localPlayer)
-			local humanoid = getHumanoid(localPlayer)
-			if not root or not humanoid or humanoid.Health <= 0 then autoFarmRunning = false break end
-			local coin = getNearestCoin()
-			if coin then
-				local dist = (root.Position - coin.Position).Magnitude
-				local duration = dist / 30
-				if duration > 0.05 then
-					humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-					local tween = tweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = coin.CFrame})
-					tween:Play()
-					tween.Completed:Wait()
-				else root.CFrame = coin.CFrame end
-				task.wait(0.1)
-			else task.wait(0.5) end
-		end
-	end
-	local function startAutoFarm()
-		if autoFarmRunning then return end
-		autoFarmRunning = true
-		autoFarmThread = task.spawn(autoFarmLoop)
-	end
-	local function stopAutoFarm()
-		autoFarmRunning = false
-		if autoFarmThread then task.cancel(autoFarmThread) autoFarmThread = nil end
-	end
-	local function getPredictedPosition(target)
-		if not target or not target.Character then return Vector3.new(0,0,0) end
-		local hrp = target.Character:FindFirstChild("HumanoidRootPart")
-		if not hrp then return Vector3.new(0,0,0) end
-		local vel = hrp.AssemblyLinearVelocity or hrp.Velocity or Vector3.new(0,0,0)
-		return hrp.Position + vel * 0.028
-	end
-	local function gunSilentAim()
-		local char = localPlayer.Character
-		if not char then return end
-		local target = findMurderer()
-		if not target or not target.Character then return end
-		local mHRP = target.Character:FindFirstChild("HumanoidRootPart")
-		local lHRP = char:FindFirstChild("HumanoidRootPart")
-		if not mHRP or not lHRP then return end
-		if not char:FindFirstChild("Gun") then
-			local backpack = localPlayer:FindFirstChild("Backpack")
-			if backpack then
-				local gun = backpack:FindFirstChild("Gun")
-				if gun then
-					local humanoid = getHumanoid(localPlayer)
-					if humanoid then pcall(function() humanoid:EquipTool(gun) end) task.wait(0.1) end
-				end
-			end
-		end
-		local gun = char:FindFirstChild("Gun") or char:FindFirstChild("Revolver")
-		if not gun then return end
-		local predPos = getPredictedPosition(target)
-		local args = { CFrame.new(lHRP.Position, predPos), CFrame.new(predPos) }
-		if gun:FindFirstChild("Shoot") then pcall(function() gun.Shoot:FireServer(unpack(args)) end) end
-	end
-	local function grabGun()
-		local root = getRoot(localPlayer)
-		if not root then return end
-		local map = findMap()
-		if not map then return end
-		local gunDrop = map:FindFirstChild("GunDrop")
-		if gunDrop and gunDrop:IsA("BasePart") and firetouchinterest then
-			pcall(function()
-				firetouchinterest(gunDrop, root, 1)
-				firetouchinterest(gunDrop, root, 0)
-			end)
-		end
-	end
-	local function executeThrowAtNearest()
-		local char = localPlayer.Character
-		local humanoid = getHumanoid(localPlayer)
-		if not char or not humanoid then return end
-		local knife = char:FindFirstChild("Knife")
-		if not knife then
-			local backpack = localPlayer:FindFirstChild("Backpack")
-			if backpack and backpack:FindFirstChild("Knife") then
-				humanoid:EquipTool(backpack.Knife)
-				task.wait(0.1)
-				knife = char:FindFirstChild("Knife")
-			end
-		end
-		if not knife or not knife:FindFirstChild("Throw") then return end
-		local myRoot = getRoot(localPlayer)
-		if not myRoot then return end
-		local target, dist = nil, 1000
-		for _, v in ipairs(playersService:GetPlayers()) do
-			if v ~= localPlayer then
-				local enemyRoot = getRoot(v)
-				if enemyRoot then
-					local h = getHumanoid(v)
-					if h and h.Health > 0 then
-						local mag = (myRoot.Position - enemyRoot.Position).Magnitude
-						if mag < dist then dist = mag target = enemyRoot end
-					end
-				end
-			end
-		end
-		if target then
-			local prediction = target.Position + (target.AssemblyLinearVelocity * 0.05 * (dist / 100))
-			local throwCFrame = CFrame.new(myRoot.Position, prediction)
-			knife.Throw:FireServer(throwCFrame, prediction)
-		end
-	end
-	local function killAll()
-		local char = localPlayer.Character
-		local humanoid = getHumanoid(localPlayer)
-		if not char or not humanoid then return end
-		local knife = char:FindFirstChild("Knife")
-		if not knife then
-			local backpack = localPlayer:FindFirstChild("Backpack")
-			if backpack and backpack:FindFirstChild("Knife") then
-				humanoid:EquipTool(backpack.Knife)
-				task.wait(0.1)
-				knife = char:FindFirstChild("Knife")
-			end
-		end
-		if not knife or not knife:IsA("Tool") then return end
-		local handle = knife:FindFirstChild("Handle")
-		local stab = knife:FindFirstChild("Stab")
-		if not handle then return end
-		for _, v in ipairs(playersService:GetPlayers()) do
-			if v ~= localPlayer then
-				local enemyRoot = getRoot(v)
-				if enemyRoot then
-					pcall(function()
-						firetouchinterest(handle, enemyRoot, 1)
-						firetouchinterest(handle, enemyRoot, 0)
-						if stab then stab:FireServer(enemyRoot.Position) end
-					end)
-					task.wait(0.1)
-				end
-			end
-		end
-	end
-	local function killAura()
-		local root = getRoot(localPlayer)
-		local char = localPlayer.Character
-		if not root or not char then return end
-		local knife = char:FindFirstChild("Knife")
-		if not knife then
-			local backpack = localPlayer:FindFirstChild("Backpack")
-			if backpack and backpack:FindFirstChild("Knife") then
-				local humanoid = getHumanoid(localPlayer)
-				if humanoid then humanoid:EquipTool(backpack.Knife) task.wait(0.1) knife = char:FindFirstChild("Knife") end
-			end
-		end
-		if not knife or not knife:IsA("Tool") then return end
-		local handle = knife:FindFirstChild("Handle")
-		if not handle then return end
-		local range = flags.killAuraRange or 15
-		for _, player in ipairs(playersService:GetPlayers()) do
-			if player ~= localPlayer then
-				local targetRoot = getRoot(player)
-				if targetRoot and (root.Position - targetRoot.Position).Magnitude <= range then
-					pcall(function()
-						knife:Activate()
-						if firetouchinterest then
-							firetouchinterest(handle, targetRoot, 1)
-							firetouchinterest(targetRoot, handle, 0)
-						end
-					end)
-				end
-			end
-		end
-	end
-	local function applyHitbox()
-		for _, plr in ipairs(playersService:GetPlayers()) do
-			if plr ~= localPlayer and plr.Character then
-				local root = plr.Character:FindFirstChild("HumanoidRootPart")
-				if root then
-					if flags.hitboxExpand then
-						root.Size = Vector3.new(flags.hitboxSize, flags.hitboxSize, flags.hitboxSize)
-						root.Transparency = flags.hitboxVisible and 0.5 or 1
-						root.CanCollide = false
-					else
-						root.Size = Vector3.new(2, 2, 1)
-						root.Transparency = 1
-						root.CanCollide = false
-					end
-				end
-			end
-		end
-	end
-	task.spawn(function()
-		while true do
-			if flags.hitboxExpand then pcall(applyHitbox) end
-			task.wait(0.2)
-		end
-	end)
-	local function applyMovement()
-		local humanoid = getHumanoid(localPlayer)
-		if not humanoid then return end
-		pcall(function()
-			if flags.speedEnabled then humanoid.WalkSpeed = math.max(16, math.min(50, flags.speedValue))
-			else humanoid.WalkSpeed = 16 end
-		end)
-		pcall(function()
-			if flags.jumpEnabled then humanoid.JumpPower = math.max(50, math.min(120, flags.jumpValue))
-			else humanoid.JumpPower = 50 end
-		end)
-	end
-	local noclipConnection
-	local function toggleNoclip(state)
-		if noclipConnection then pcall(noclipConnection.Disconnect, noclipConnection) noclipConnection = nil end
-		if state then
-			noclipConnection = runService.Stepped:Connect(function()
-				local char = localPlayer.Character
-				if char then
-					for _, part in ipairs(char:GetDescendants()) do
-						if part:IsA("BasePart") then part.CanCollide = false end
-					end
-				end
-			end)
-		end
-	end
-	task.spawn(function()
-		while true do
-			if flags.killAura then pcall(killAura) end
-			if flags.autoShoot then pcall(gunSilentAim) end
-			if flags.autoGrabGun then pcall(grabGun) end
-			if flags.autoKnifeThrow and getPlayerRole(localPlayer) == "Murderer" then pcall(executeThrowAtNearest) end
-			pcall(applyMovement)
-			task.wait(0.15)
-		end
-	end)
-	localPlayer.CharacterAdded:Connect(function()
-		task.wait(0.5)
-		if flags.noclipEnabled then toggleNoclip(true) end
-		if flags.godmode then applyGodmode(true) end
-	end)
-	playersService.PlayerRemoving:Connect(function(player)
-		removeHighlight(player)
-		removeTag(player)
-	end)
-
-	local WindUI = getWindUILibrary()
-	local window = createPotentWindow(WindUI, "POTENTHUB_MM2", "Murder Mystery 2")
-
-	local visualsTab = window:Tab({ Title = "👁️ Visuals", Icon = "eye" })
-	local farmTab = window:Tab({ Title = "🪙 Farm", Icon = "coins" })
-	local combatTab = window:Tab({ Title = "⚔️ Combat", Icon = "swords" })
-	local teleportTab = window:Tab({ Title = "🌀 Teleports", Icon = "map-pin" })
-	local playerTab = window:Tab({ Title = "👤 Player", Icon = "user" })
-	local creditsTab = window:Tab({ Title = "📜 Credits", Icon = "info" })
-
-	visualsTab:Section({ Title = "🎯 ESP" })
-	visualsTab:Toggle({
-		Title = "⚡ ESP ALL", Desc = "🔴 Murderer | 🔵 Sheriff | 🟢 Innocent",
-		Value = flags.espAll,
-		Callback = function(state)
-			flags.espAll = state
-			saveAll()
-			if not state then
-				for player, _ in pairs(highlights) do removeHighlight(player) removeTag(player) end
-			end
-		end
-	})
-	visualsTab:Toggle({
-		Title = "🔫 Gun Drop ESP", Desc = "Resalta la pistola caída",
-		Value = flags.espGun,
-		Callback = function(state) flags.espGun = state saveAll() end
-	})
-	visualsTab:Section({ Title = "🔔 Notificaciones" })
-	visualsTab:Toggle({
-		Title = "🔪 Notify Murderer", Desc = "Notifica cuando aparece el asesino",
-		Value = flags.notifyMurderer,
-		Callback = function(state) flags.notifyMurderer = state saveAll() end
-	})
-	visualsTab:Toggle({
-		Title = "🔫 Notify Sheriff", Desc = "Notifica cuando aparece el sheriff",
-		Value = flags.notifySheriff,
-		Callback = function(state) flags.notifySheriff = state saveAll() end
-	})
-	visualsTab:Toggle({
-		Title = "🎭 Instant Role Reveal", Desc = "Muestra tu rol al inicio de la ronda",
-		Value = flags.instantRole,
-		Callback = function(state) flags.instantRole = state saveAll() end
-	})
-
-	farmTab:Section({ Title = "💰 Auto Farm" })
-	farmTab:Toggle({
-		Title = "🪙 Auto Farm Coins (Mejorado)", Desc = "Farmea monedas automáticamente",
-		Value = flags.autoFarmCoins,
-		Callback = function(state)
-			flags.autoFarmCoins = state
-			saveAll()
-			if state then coinsReach(true) startAutoFarm()
-			else stopAutoFarm() coinsReach(false) end
-		end
-	})
-
-	combatTab:Section({ Title = "🔪 Murderer" })
-	combatTab:Toggle({
-		Title = "💀 Knife Kill Aura", Desc = "Ataca a jugadores cercanos",
-		Value = flags.killAura,
-		Callback = function(state) flags.killAura = state saveAll() end
-	})
-	local rangeLabel = combatTab:Paragraph({ Title = "📊 Kill Aura Range", Desc = "Current: " .. tostring(flags.killAuraRange) })
-	combatTab:Button({ Title = "➕ Range", Callback = function()
-		if flags.killAuraRange < 50 then flags.killAuraRange = flags.killAuraRange + 1 saveAll() rangeLabel:SetDesc("Current: " .. tostring(flags.killAuraRange)) end
-	end })
-	combatTab:Button({ Title = "➖ Range", Callback = function()
-		if flags.killAuraRange > 5 then flags.killAuraRange = flags.killAuraRange - 1 saveAll() rangeLabel:SetDesc("Current: " .. tostring(flags.killAuraRange)) end
-	end })
-	combatTab:Button({ Title = "💀 Kill All", Callback = function() killAll() end })
-	combatTab:Toggle({
-		Title = "🔪 Auto Knife Throw", Desc = "Lanza el cuchillo al más cercano",
-		Value = flags.autoKnifeThrow,
-		Callback = function(state) flags.autoKnifeThrow = state saveAll() end
-	})
-
-	combatTab:Section({ Title = "🔫 Sheriff" })
-	combatTab:Toggle({
-		Title = "🎯 Gun Silent Aim", Desc = "Dispara al asesino sin mover la cámara",
-		Value = flags.gunSilentAim,
-		Callback = function(state) flags.gunSilentAim = state saveAll() end
-	})
-	combatTab:Toggle({
-		Title = "🎯 Auto Shoot Murderer", Desc = "Dispara automáticamente al asesino",
-		Value = flags.autoShoot,
-		Callback = function(state) flags.autoShoot = state saveAll() end
-	})
-	combatTab:Toggle({
-		Title = "🤚 Auto Grab Gun", Desc = "Recoge la pistola automáticamente",
-		Value = flags.autoGrabGun,
-		Callback = function(state) flags.autoGrabGun = state saveAll() end
-	})
-
-	combatTab:Section({ Title = "📦 Hitbox Expander" })
-	combatTab:Toggle({
-		Title = "📦 Hitbox Expand", Desc = "Expande el hitbox de los jugadores",
-		Value = flags.hitboxExpand,
-		Callback = function(state) flags.hitboxExpand = state saveAll() end
-	})
-	local hitboxLabel = combatTab:Paragraph({ Title = "📊 Hitbox Size", Desc = "Current: " .. tostring(flags.hitboxSize) })
-	combatTab:Button({ Title = "➕ Hitbox Size", Callback = function()
-		if flags.hitboxSize < 20 then flags.hitboxSize = flags.hitboxSize + 1 saveAll() hitboxLabel:SetDesc("Current: " .. tostring(flags.hitboxSize)) end
-	end })
-	combatTab:Button({ Title = "➖ Hitbox Size", Callback = function()
-		if flags.hitboxSize > 1 then flags.hitboxSize = flags.hitboxSize - 1 saveAll() hitboxLabel:SetDesc("Current: " .. tostring(flags.hitboxSize)) end
-	end })
-	combatTab:Toggle({
-		Title = "📦 Hitbox Visible", Desc = "Muestra el hitbox expandido",
-		Value = flags.hitboxVisible,
-		Callback = function(state) flags.hitboxVisible = state saveAll() end
-	})
-
-	teleportTab:Section({ Title = "🚀 Quick TP" })
-	teleportTab:Button({ Title = "⬇️ Teleport to Gun Drop", Callback = function()
-		local root = getRoot(localPlayer)
-		if not root then return end
-		for _, desc in ipairs(workspaceService:GetDescendants()) do
-			if desc.Name == "GunDrop" and desc:IsA("BasePart") then
-				root.CFrame = desc.CFrame + Vector3.new(0, 3, 0)
-				WindUI:Notify({ Title = "Teleport", Content = "✅ Teleported to gun", Duration = 2 })
-				return
-			end
-		end
-		WindUI:Notify({ Title = "Teleport", Content = "❌ No gun drop", Duration = 2 })
-	end })
-	teleportTab:Button({ Title = "🔴 Teleport to Murderer", Callback = function()
-		local target = findMurderer()
-		local root = getRoot(localPlayer)
-		local targetRoot = target and getRoot(target)
-		if root and targetRoot then
-			root.CFrame = targetRoot.CFrame + Vector3.new(0, 3, 0)
-			WindUI:Notify({ Title = "Teleport", Content = "✅ Teleported to murderer", Duration = 2 })
-		else WindUI:Notify({ Title = "Teleport", Content = "❌ Murderer not found", Duration = 2 }) end
-	end })
-	teleportTab:Button({ Title = "🔵 Teleport to Sheriff", Callback = function()
-		local target = findSheriff()
-		local root = getRoot(localPlayer)
-		local targetRoot = target and getRoot(target)
-		if root and targetRoot then
-			root.CFrame = targetRoot.CFrame + Vector3.new(0, 3, 0)
-			WindUI:Notify({ Title = "Teleport", Content = "✅ Teleported to sheriff", Duration = 2 })
-		else WindUI:Notify({ Title = "Teleport", Content = "❌ Sheriff not found", Duration = 2 }) end
-	end })
-
-	playerTab:Section({ Title = "🏃 Movement" })
-	playerTab:Toggle({
-		Title = "⚡ Custom WalkSpeed (Max: 50)", Value = flags.speedEnabled,
-		Callback = function(state) flags.speedEnabled = state saveAll() pcall(applyMovement) end
-	})
-	local speedLabel = playerTab:Paragraph({ Title = "📊 WalkSpeed Value", Desc = "Current: " .. tostring(flags.speedValue) })
-	playerTab:Button({ Title = "➕ WalkSpeed", Callback = function()
-		if flags.speedValue < 50 then flags.speedValue = flags.speedValue + 1 saveAll() speedLabel:SetDesc("Current: " .. tostring(flags.speedValue)) if flags.speedEnabled then pcall(applyMovement) end end
-	end })
-	playerTab:Button({ Title = "➖ WalkSpeed", Callback = function()
-		if flags.speedValue > 16 then flags.speedValue = flags.speedValue - 1 saveAll() speedLabel:SetDesc("Current: " .. tostring(flags.speedValue)) if flags.speedEnabled then pcall(applyMovement) end end
-	end })
-	playerTab:Toggle({
-		Title = "🚀 Custom JumpPower", Value = flags.jumpEnabled,
-		Callback = function(state) flags.jumpEnabled = state saveAll() pcall(applyMovement) end
-	})
-	local jumpLabel = playerTab:Paragraph({ Title = "📊 JumpPower Value", Desc = "Current: " .. tostring(flags.jumpValue) })
-	playerTab:Button({ Title = "➕ JumpPower", Callback = function()
-		if flags.jumpValue < 120 then flags.jumpValue = flags.jumpValue + 1 saveAll() jumpLabel:SetDesc("Current: " .. tostring(flags.jumpValue)) if flags.jumpEnabled then pcall(applyMovement) end end
-	end })
-	playerTab:Button({ Title = "➖ JumpPower", Callback = function()
-		if flags.jumpValue > 50 then flags.jumpValue = flags.jumpValue - 1 saveAll() jumpLabel:SetDesc("Current: " .. tostring(flags.jumpValue)) if flags.jumpEnabled then pcall(applyMovement) end end
-	end })
-
-	playerTab:Section({ Title = "👻 God Mode" })
-	playerTab:Toggle({
-		Title = "🌀 Noclip", Desc = "Atraviesa paredes",
-		Value = flags.noclipEnabled,
-		Callback = function(state) flags.noclipEnabled = state saveAll() toggleNoclip(state) end
-	})
-	playerTab:Toggle({
-		Title = "❤️ Godmode", Desc = "Restaura tu vida automáticamente",
-		Value = flags.godmode,
-		Callback = function(state) flags.godmode = state saveAll() applyGodmode(state) end
-	})
-	playerTab:Section({ Title = "🛡️ Protección" })
-	playerTab:Toggle({
-		Title = "🛡️ Anti Silent Aim", Desc = "Protege contra silent aim",
-		Value = flags.antiSilentAim,
-		Callback = function(state) flags.antiSilentAim = state saveAll() end
-	})
-
-	creditsTab:Section({ Title = "⚡ POTENT HUB" })
-	creditsTab:Paragraph({ Title = "👑 Owner", Desc = "POTENT HUB" })
-	creditsTab:Paragraph({ Title = "🎮 Game", Desc = "Murder Mystery 2" })
-
-	WindUI:Notify({ Title = "⚡ POTENT HUB", Content = "✅ Murder Mystery 2 loaded!", Duration = 4 })
-end
-
--- ============================================================
--- ========== JUEGO 4: KITTEN FARM ==========
--- ============================================================
-local function runKittenFarm()
-	local LocalPlayer = playersService.LocalPlayer
-	local TARGET_PLACE_ID = 77813828595591
-
-	local Loops = {}
-	local antiAfkConn = nil
-
-	local sessionStart = tick()
-	local sessionStartMoney = 0
-	local sessionStartYarn = 0
-	local lastRebirthNotified = -1
-	local webhookUrl = ""
-
-	local function getOwnPlot()
-		local plots = workspaceService:FindFirstChild("Plots")
-		if not plots then return nil end
-		for _, p in ipairs(plots:GetChildren()) do
-			if p:GetAttribute("Owner") == LocalPlayer.UserId then
-				return p
-			end
-		end
-		return nil
-	end
-
-	local function getHRP()
-		local char = LocalPlayer.Character
-		return char and char:FindFirstChild("HumanoidRootPart")
-	end
-
-	local function pressButton(name)
-		local plot = getOwnPlot()
-		if not plot then return false end
-		local buttons = plot:FindFirstChild("Buttons")
-		local btn = buttons and buttons:FindFirstChild(name)
-		local press = btn and btn:FindFirstChild("Press")
-		local hrp = getHRP()
-		if not press or not hrp then return false end
-		pcall(function()
-			customFireTouch(hrp, press, 1)
-			task.wait(0.08)
-			customFireTouch(hrp, press, 0)
-		end)
-		return true
-	end
-
-	local function runAutoLoop(id, isActive, fn, interval)
-		if Loops[id] then task.cancel(Loops[id]) Loops[id] = nil end
-		Loops[id] = task.spawn(function()
-			while isActive() do
-				pcall(fn)
-				task.wait(interval or 1)
-			end
-			Loops[id] = nil
-		end)
-	end
-
-	local function stopLoop(id)
-		if Loops[id] then task.cancel(Loops[id]) Loops[id] = nil end
-	end
-
-	local function setAntiAFK(state)
-		if state then
-			if antiAfkConn then antiAfkConn:Disconnect() end
-			pcall(function()
-				if getconnections then
-					for _, c in ipairs(getconnections(LocalPlayer.Idled)) do c:Disable() end
-				end
-			end)
-			antiAfkConn = LocalPlayer.Idled:Connect(function()
-				pcall(function()
-					virtualUser:CaptureController()
-					virtualUser:ClickButton2(Vector2.new())
-				end)
-			end)
-		else
-			if antiAfkConn then antiAfkConn:Disconnect() antiAfkConn = nil end
-		end
-	end
-
-	local function getMoney()
-		local m = LocalPlayer:FindFirstChild("Money")
-		return m and m.Value or 0
-	end
-
-	local function getYarn()
-		local y = LocalPlayer:FindFirstChild("Yarn")
-		return y and y.Value or 0
-	end
-
-	local function getRebirths()
-		local r = LocalPlayer:FindFirstChild("Rebirths") or LocalPlayer:FindFirstChild("Prestige")
-		return r and r.Value or 0
-	end
-
-	local function sendWebhook(title, description, color)
-		if not webhookUrl or webhookUrl == "" then return end
-		local payload = {
-			username = "Potent Hub",
-			embeds = {{
-				title = title,
-				description = description,
-				color = color or 16766720,
-				footer = { text = "Potent Hub | Kitten Farm" },
-				timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-			}},
-		}
-		pcall(function()
-			customHttpPost(webhookUrl, httpService:JSONEncode(payload), "application/json")
-		end)
-	end
-
-	local WindUI = getWindUILibrary()
-	local window = createPotentWindow(WindUI, "POTENTHUB_KITTEN_FARM", "Kitten Farm")
-
-	local mainTab = window:Tab({ Title = "🏠 Main", Icon = "house" })
-	local farmingTab = window:Tab({ Title = "🚜 Farming", Icon = "tractor" })
-	local inventoryTab = window:Tab({ Title = "🎒 Inventory", Icon = "backpack" })
-	local rebirthTab = window:Tab({ Title = "🔄 Rebirth", Icon = "refresh-cw" })
-	local serverTab = window:Tab({ Title = "🌐 Server", Icon = "globe" })
-	local webhookTab = window:Tab({ Title = "🔔 Webhook", Icon = "bell" })
-	local settingsTab = window:Tab({ Title = "⚙️ Settings", Icon = "settings" })
-
-	mainTab:Section({ Title = "ℹ️ Game Info" })
-	mainTab:Paragraph({ Title = "Game", Desc = "Kitten Farm" })
-	mainTab:Paragraph({ Title = "PlaceId", Desc = tostring(TARGET_PLACE_ID) })
-
-	local uptimeParagraph = mainTab:Paragraph({ Title = "⏱️ Uptime", Desc = "0s" })
-	local statusParagraph = mainTab:Paragraph({ Title = "📊 Status", Desc = "Loading..." })
-
-	mainTab:Section({ Title = "📈 Session Stats" })
-	local moneyPerHourParagraph = mainTab:Paragraph({ Title = "💰 Money / Hour", Desc = "Calculating..." })
-	local yarnPerHourParagraph = mainTab:Paragraph({ Title = "🧶 Yarn / Hour", Desc = "Calculating..." })
-	local totalGainedParagraph = mainTab:Paragraph({ Title = "📊 Total Gained", Desc = "Money: 0 | Yarn: 0" })
-
-	mainTab:Button({
-		Title = "🔄 Reset Session Stats",
-		Callback = function()
-			sessionStart = tick()
-			sessionStartMoney = getMoney()
-			sessionStartYarn = getYarn()
-			WindUI:Notify({ Title = "Stats Reset", Content = "Session stats reset", Duration = 2 })
-		end,
-	})
-
-	task.spawn(function()
-		task.wait(1.5)
-		sessionStartMoney = getMoney()
-		sessionStartYarn = getYarn()
-		lastRebirthNotified = getRebirths()
-
-		while true do
-			task.wait(1)
-			pcall(function()
-				local elapsed = math.floor(tick() - sessionStart)
-				uptimeParagraph:SetDesc(string.format("%dh %dm %ds",
-					math.floor(elapsed / 3600),
-					math.floor((elapsed % 3600) / 60),
-					elapsed % 60
-				))
-
-				local plot = getOwnPlot()
-				local curMoney = getMoney()
-				local curYarn = getYarn()
-
-				statusParagraph:SetDesc(string.format(
-					"Plot: %s | Cash: %s | Yarn: %s",
-					plot and plot.Name or "?",
-					tostring(curMoney),
-					tostring(curYarn)
-				))
-
-				local hoursElapsed = math.max((tick() - sessionStart) / 3600, 0.001)
-				local moneyGained = curMoney - sessionStartMoney
-				local yarnGained = curYarn - sessionStartYarn
-				local moneyRate = math.floor(moneyGained / hoursElapsed)
-				local yarnRate = math.floor(yarnGained / hoursElapsed)
-
-				moneyPerHourParagraph:SetDesc(tostring(moneyRate) .. " /hr")
-				yarnPerHourParagraph:SetDesc(tostring(yarnRate) .. " /hr")
-				totalGainedParagraph:SetDesc(string.format("Money: %d | Yarn: %d", moneyGained, yarnGained))
-			end)
-		end
-	end)
-
-	farmingTab:Section({ Title = "🧶 Resource Collecting" })
-	local autoCollectYarn = false
-	farmingTab:Toggle({
-		Title = "Auto Collect Yarn",
-		Desc = "Fires Yarn.Collect remote for nearby yarn every 1s",
-		Value = false,
-		Callback = function(state)
-			autoCollectYarn = state
-			if state then
-				runAutoLoop("AutoCollectYarn", function() return autoCollectYarn end, function()
-					local folder = workspaceService:FindFirstChild("Yarn")
-					local remotes = replicatedStorage:FindFirstChild("Remotes")
-					local yarnRemote = remotes and remotes:FindFirstChild("Yarn")
-					local collect = yarnRemote and yarnRemote:FindFirstChild("Collect")
-					if not folder or not collect then return end
-					for _, m in ipairs(folder:GetChildren()) do
-						if not autoCollectYarn then break end
-						pcall(function() collect:FireServer(m.Name) end)
-					end
-				end, 1)
-			else
-				stopLoop("AutoCollectYarn")
-			end
-		end,
-	})
-
-	local autoCollectMoney = false
-	farmingTab:Toggle({
-		Title = "Auto Collect Money",
-		Desc = "Touches CollectCash button on your plot every 1s",
-		Value = false,
-		Callback = function(state)
-			autoCollectMoney = state
-			if state then
-				runAutoLoop("AutoCollectMoney", function() return autoCollectMoney end, function()
-					pressButton("CollectCash")
-				end, 1)
-			else
-				stopLoop("AutoCollectMoney")
-			end
-		end,
-	})
-
-	farmingTab:Section({ Title = "💰 Selling" })
-	local autoDepositYarn = false
-	farmingTab:Toggle({
-		Title = "Auto Deposit Yarn",
-		Desc = "Touches DepositYarn button on your plot every 1s",
-		Value = false,
-		Callback = function(state)
-			autoDepositYarn = state
-			if state then
-				runAutoLoop("AutoDepositYarn", function() return autoDepositYarn end, function()
-					pressButton("DepositYarn")
-				end, 1)
-			else
-				stopLoop("AutoDepositYarn")
-			end
-		end,
-	})
-
-	farmingTab:Section({ Title = "🎁 Daily Rewards" })
-	local autoClaimDaily = false
-	farmingTab:Toggle({
-		Title = "Auto Claim Daily Rewards",
-		Desc = "Attempts to claim any daily / streak / login reward",
-		Value = false,
-		Callback = function(state)
-			autoClaimDaily = state
-			if state then
-				runAutoLoop("AutoClaimDaily", function() return autoClaimDaily end, function()
-					local remotes = replicatedStorage:FindFirstChild("Remotes")
-					if not remotes then return end
-					local candidates = {
-						"ClaimDaily", "ClaimDailyReward", "DailyReward",
-						"ClaimStreak", "ClaimStreakReward",
-						"ClaimLogin", "ClaimLoginReward",
-						"ClaimFreeReward", "ClaimReward",
-					}
-					for _, remoteName in ipairs(candidates) do
-						local remote = remotes:FindFirstChild(remoteName)
-						if remote then
-							pcall(function()
-								if remote:IsA("RemoteEvent") then
-									remote:FireServer()
-								elseif remote:IsA("RemoteFunction") then
-									remote:InvokeServer()
-								end
-							end)
-						end
-					end
-				end, 60)
-			else
-				stopLoop("AutoClaimDaily")
-			end
-		end,
-	})
-
-	farmingTab:Button({
-		Title = "🎁 Claim Daily Now",
-		Callback = function()
-			local remotes = replicatedStorage:FindFirstChild("Remotes")
-			if not remotes then
-				WindUI:Notify({ Title = "Daily", Content = "❌ Remotes folder not found", Duration = 3 })
-				return
-			end
-			local claimed = 0
-			local candidates = {
-				"ClaimDaily", "ClaimDailyReward", "DailyReward",
-				"ClaimStreak", "ClaimStreakReward",
-				"ClaimLogin", "ClaimLoginReward",
-				"ClaimFreeReward", "ClaimReward",
-			}
-			for _, remoteName in ipairs(candidates) do
-				local remote = remotes:FindFirstChild(remoteName)
-				if remote then
-					local ok = pcall(function()
-						if remote:IsA("RemoteEvent") then remote:FireServer()
-						elseif remote:IsA("RemoteFunction") then remote:InvokeServer() end
-					end)
-					if ok then claimed = claimed + 1 end
-				end
-			end
-			WindUI:Notify({
-				Title = "Daily",
-				Content = claimed > 0 and ("✅ Fired " .. claimed .. " reward remotes") or "⚠️ No known reward remotes",
-				Duration = 3,
-			})
-		end,
-	})
-
-	inventoryTab:Section({ Title = "🐱 Kitten Purchasing" })
-	local autoBuy1, autoBuy5, autoBuy25, autoBuy100 = false, false, false, false
-
-	inventoryTab:Toggle({
-		Title = "Auto Buy 1 Kitten", Value = false,
-		Callback = function(state)
-			autoBuy1 = state
-			if state then runAutoLoop("AutoBuy1", function() return autoBuy1 end, function() pressButton("Buy1") end, 1)
-			else stopLoop("AutoBuy1") end
-		end,
-	})
-
-	inventoryTab:Toggle({
-		Title = "Auto Buy 5 Kittens", Value = false,
-		Callback = function(state)
-			autoBuy5 = state
-			if state then runAutoLoop("AutoBuy5", function() return autoBuy5 end, function() pressButton("Buy5") end, 1)
-			else stopLoop("AutoBuy5") end
-		end,
-	})
-
-	inventoryTab:Toggle({
-		Title = "Auto Buy 25 Kittens", Value = false,
-		Callback = function(state)
-			autoBuy25 = state
-			if state then runAutoLoop("AutoBuy25", function() return autoBuy25 end, function() pressButton("Buy25") end, 1)
-			else stopLoop("AutoBuy25") end
-		end,
-	})
-
-	inventoryTab:Toggle({
-		Title = "Auto Buy 100 Kittens", Value = false,
-		Callback = function(state)
-			autoBuy100 = state
-			if state then runAutoLoop("AutoBuy100", function() return autoBuy100 end, function() pressButton("Buy100") end, 1)
-			else stopLoop("AutoBuy100") end
-		end,
-	})
-
-	inventoryTab:Section({ Title = "📈 Stat Upgrades" })
-	local autoUpgradeYarnRate = false
-	inventoryTab:Toggle({
-		Title = "Auto Upgrade Yarn Rate", Desc = "Touches UpgradeYarnRate button every 1s", Value = false,
-		Callback = function(state)
-			autoUpgradeYarnRate = state
-			if state then runAutoLoop("AutoUpgradeYarnRate", function() return autoUpgradeYarnRate end, function() pressButton("UpgradeYarnRate") end, 1)
-			else stopLoop("AutoUpgradeYarnRate") end
-		end,
-	})
-
-	local autoUpgradeBuyTier = false
-	inventoryTab:Toggle({
-		Title = "Auto Upgrade Buy Tier", Desc = "Touches UpgradeBuyTier button every 1s", Value = false,
-		Callback = function(state)
-			autoUpgradeBuyTier = state
-			if state then runAutoLoop("AutoUpgradeBuyTier", function() return autoUpgradeBuyTier end, function() pressButton("UpgradeBuyTier") end, 1)
-			else stopLoop("AutoUpgradeBuyTier") end
-		end,
-	})
-
-	inventoryTab:Section({ Title = "📦 Misc" })
-	local autoMerge = false
-	inventoryTab:Toggle({
-		Title = "Auto Merge", Desc = "Touches Merge button on your plot every 1s", Value = false,
-		Callback = function(state)
-			autoMerge = state
-			if state then runAutoLoop("AutoMerge", function() return autoMerge end, function() pressButton("Button") end, 1)
-			else stopLoop("AutoMerge") end
-		end,
-	})
-
-	rebirthTab:Section({ Title = "🔄 Auto Rebirth" })
-	local autoRebirth = false
-	rebirthTab:Toggle({
-		Title = "Auto Rebirth", Desc = "Checks Prestige price, rebirths when affordable (1s)", Value = false,
-		Callback = function(state)
-			autoRebirth = state
-			if state then
-				runAutoLoop("AutoRebirth", function() return autoRebirth end, function()
-					local remotes = replicatedStorage:FindFirstChild("Remotes")
-					local prestige = remotes and remotes:FindFirstChild("Prestige")
-					local money = LocalPlayer:FindFirstChild("Money")
-					if not prestige or not money then return end
-
-					local ok, data = pcall(function() return prestige:InvokeServer("GetData") end)
-					if not ok or type(data) ~= "table" then return end
-					if data.Maxed then return end
-					if typeof(data.Price) == "number" and money.Value >= data.Price then
-						pcall(function() prestige:InvokeServer("Prestige") end)
-					end
-				end, 1)
-			else
-				stopLoop("AutoRebirth")
-			end
-		end,
-	})
-
-	rebirthTab:Button({
-		Title = "🔄 Rebirth Now",
-		Callback = function()
-			local remotes = replicatedStorage:FindFirstChild("Remotes")
-			local prestige = remotes and remotes:FindFirstChild("Prestige")
-			if prestige then
-				local ok = pcall(function() prestige:InvokeServer("Prestige") end)
-				WindUI:Notify({ Title = "Rebirth", Content = ok and "✅ Rebirth fired" or "❌ Failed", Duration = 3 })
-			end
-		end,
-	})
-
-	settingsTab:Section({ Title = "⚙️ System" })
-	settingsTab:Toggle({
-		Title = "Anti-AFK", Value = true,
-		Callback = function(state) setAntiAFK(state) end
-	})
-	setAntiAFK(true)
-
-	settingsTab:Button({
-		Title = "🗑️ Unload GUI",
-		Callback = function()
-			for id, loop in pairs(Loops) do
-				if type(loop) == "thread" then task.cancel(loop) end
-			end
-			table.clear(Loops)
-			if antiAfkConn then antiAfkConn:Disconnect() end
-			window:Destroy()
-		end,
-	})
-
-	WindUI:Notify({ Title = "⚡ POTENT HUB", Content = "✅ Kitten Farm loaded!", Duration = 4 })
-end
-
--- ============================================================
--- ========== JUEGO 5: SPEED KEYBOARD ESCAPE ==========
+-- ========== JUEGO 5: SPEED KEYBOARD ESCAPE (RUTAS COMPLETAS) ==========
 -- ============================================================
 local function runSpeedKeyboardEscape()
 	local EXACT_NAMES = {
@@ -3205,6 +1341,9 @@ local function runSpeedKeyboardEscape()
 		end
 	end
 
+	-- ============================================================
+	-- ROUTES WORLD 2
+	-- ============================================================
 	local RAW_W2 = {
 		["150K"] = {
 			-397.56, 506.15, -51.07,  -401.05, 505.25, 62.40,  -402.06, 505.25, 127.12,
@@ -3231,8 +1370,154 @@ local function runSpeedKeyboardEscape()
 			-400.65, 609.11, 677.73,  -382.37, 609.11, 707.32,  -381.79, 609.11, 739.28,
 			-399.59, 609.11, 782.25,  -400.40, 608.67, 841.49,  -417.27, 610.61, 842.39,
 		},
+		["1.5M"] = {
+			-396.53, 506.15, -40.06,  -400.38, 505.02, 60.98,  -405.59, 505.25, 123.49,
+			-396.93, 501.32, 191.84,  -397.04, 501.32, 435.37,  -349.90, 503.68, 487.02,
+			-346.67, 528.25, 579.61,  -451.00, 528.25, 574.09,  -450.17, 555.25, 464.37,
+			-348.02, 555.25, 468.05,  -351.86, 582.32, 580.75,  -456.47, 582.32, 578.57,
+			-451.47, 609.32, 461.42,  -400.10, 609.32, 466.43,  -399.98, 609.11, 605.61,
+			-400.85, 609.11, 672.28,  -381.99, 609.11, 708.88,  -381.63, 609.11, 735.49,
+			-402.89, 609.11, 782.55,  -400.91, 608.67, 842.79,  -399.07, 652.07, 891.53,
+			-396.95, 658.99, 1106.06, -402.38, 656.77, 1206.64, -401.64, 664.01, 1242.18,
+			-400.91, 608.67, 1264.36, -417.18, 610.61, 1261.27,
+		},
+		["2.5M"] = {
+			-398.80, 506.15, -40.85,  -404.38, 505.25, 122.56, -395.82, 501.32, 200.48,
+			-397.37, 501.32, 436.04,  -349.33, 505.04, 491.33, -347.94, 528.25, 581.98,
+			-452.57, 528.25, 577.30,  -454.68, 555.25, 463.47, -346.09, 555.25, 464.80,
+			-347.40, 582.32, 579.84,  -452.08, 582.32, 576.42, -453.29, 609.32, 463.41,
+			-401.98, 609.32, 467.31,  -398.54, 609.11, 612.87, -402.04, 608.67, 844.75,
+			-394.25, 668.72, 906.62,  -398.43, 666.48, 1203.63,-398.78, 608.64, 1267.88,
+			-401.98, 608.67, 1293.02, -400.94, 619.99, 1331.66,-402.64, 608.67, 1439.09,
+			-366.04, 628.93, 1540.43, -364.37, 629.46, 1598.64,-360.39, 606.55, 1712.95,
+			-364.49, 617.12, 1788.75, -398.10, 608.67, 1886.83,-404.40, 608.67, 2061.99,
+			-398.28, 608.67, 2246.25, -400.31, 624.61, 2398.69,-400.78, 624.61, 2414.63,
+			-417.00, 626.38, 2415.71,
+		},
+		["4M"] = {
+			-396.34, 506.15, -41.57,  -401.28, 505.25, 58.81,  -397.87, 501.32, 195.77,
+			-395.26, 501.32, 433.73,  -347.59, 505.53, 492.88, -348.63, 528.25, 583.82,
+			-453.27, 528.25, 578.26,  -453.85, 555.25, 465.17, -346.82, 555.25, 465.54,
+			-347.85, 582.32, 579.89,  -457.86, 582.32, 578.46, -454.50, 609.32, 463.49,
+			-397.10, 609.32, 463.26,  -401.19, 609.11, 613.23, -402.02, 609.11, 800.85,
+			-400.29, 608.67, 846.57,  -313.22, 608.67, 1000.25,-402.66, 609.53, 1226.30,
+			-403.33, 608.67, 1269.90, -402.91, 618.68, 1327.69,-395.92, 608.67, 1448.47,
+			-371.12, 629.26, 1541.48, -364.42, 606.55, 1719.86,-366.25, 616.48, 1786.80,
+			-401.43, 608.67, 1898.83, -399.98, 608.67, 2064.30,-399.48, 619.71, 2137.65,
+			-401.35, 608.67, 2256.11, -400.76, 620.29, 2316.98,-399.85, 624.61, 2411.24,
+			-401.12, 624.56, 2653.54, -416.85, 626.56, 2650.08,
+		},
+		["6M"] = {
+			-397.25, 506.15, -40.28,  -398.78, 505.25, 65.14,  -394.47, 501.32, 188.15,
+			-396.21, 501.32, 433.42,  -351.76, 503.06, 485.05, -351.09, 528.25, 581.20,
+			-458.46, 528.25, 578.68,  -456.19, 555.25, 462.29, -343.94, 555.25, 469.61,
+			-349.88, 582.32, 577.78,  -452.74, 582.32, 578.78, -450.30, 609.32, 459.77,
+			-401.90, 609.32, 471.41,  -401.06, 609.11, 611.22, -400.96, 609.11, 789.44,
+			-400.59, 608.67, 850.24,  -290.45, 609.00, 998.96, -388.84, 609.19, 1256.77,
+			-391.24, 608.67, 1450.20, -363.72, 629.46, 1562.38,-365.04, 606.55, 1728.39,
+			-364.90, 615.76, 1784.63, -392.87, 608.67, 1904.14,-398.03, 619.19, 1955.17,
+			-401.72, 608.67, 2073.83, -402.28, 619.56, 2137.17,-401.72, 608.67, 2261.35,
+			-401.64, 620.69, 2318.43, -401.66, 624.61, 2410.60,-400.58, 624.56, 2647.28,
+			-400.99, 624.59, 3160.69, -417.34, 626.38, 3158.17,
+		},
+		["10M"] = {
+			-396.85, 506.15, -43.66,  -397.79, 501.32, 191.99, -395.31, 501.32, 438.44,
+			-347.26, 507.10, 497.85,  -347.12, 528.25, 574.66, -452.43, 528.25, 573.53,
+			-450.80, 555.25, 466.38,  -346.80, 555.25, 469.79, -348.17, 582.32, 575.06,
+			-456.96, 582.32, 577.16,  -447.32, 609.32, 464.97, -391.00, 609.32, 474.67,
+			-401.62, 609.11, 606.76,  -399.48, 608.67, 844.03, -400.50, 608.67, 1262.01,
+			-399.16, 619.74, 1330.92, -395.81, 608.67, 1455.99,-360.86, 629.46, 1546.56,
+			-360.52, 606.55, 1731.41, -369.57, 616.70, 1787.49,-397.07, 608.67, 1900.11,
+			-399.26, 620.59, 1959.82, -399.84, 608.67, 2071.64,-405.92, 618.24, 2133.19,
+			-400.81, 608.67, 2264.26, -401.46, 618.52, 2311.65,-400.35, 624.61, 2418.86,
+			-400.52, 624.56, 2654.82, -399.89, 624.59, 3164.33,-397.51, 624.59, 3321.25,
+			-178.01, 624.59, 3330.83, -169.29, 624.59, 3210.65,-102.24, 624.59, 3227.09,
+			-122.66, 624.59, 3421.92, -258.82, 624.59, 3446.75,-266.19, 624.59, 3629.02,
+			-549.61, 624.59, 3638.24, -546.54, 624.59, 3787.04,-123.01, 624.59, 3803.17,
+			-130.94, 624.59, 3878.74, -63.36, 624.65, 3866.58, -60.23, 626.38, 3883.20,
+		},
+		["15M"] = {
+			-395.96, 506.15, -36.15,  -399.63, 501.32, 197.37, -396.13, 501.32, 434.31,
+			-338.06, 510.19, 507.66,  -346.45, 528.25, 578.81, -454.74, 528.25, 575.09,
+			-453.27, 555.25, 462.82,  -349.37, 555.25, 464.85, -346.80, 582.32, 573.29,
+			-456.64, 582.32, 568.00,  -452.93, 609.32, 460.80, -394.86, 609.32, 471.19,
+			-401.80, 609.11, 607.74,  -401.49, 608.67, 849.94, -401.29, 608.67, 1255.58,
+			-398.10, 619.35, 1329.72, -395.35, 608.67, 1453.82,-363.35, 629.46, 1544.08,
+			-373.17, 608.43, 1762.46, -404.01, 608.67, 1903.99,-409.34, 608.67, 2074.07,
+			-405.61, 618.22, 2133.13, -409.93, 620.49, 2317.59,-400.36, 624.61, 2403.06,
+			-402.71, 624.56, 2653.96, -398.45, 624.59, 3159.32,-401.37, 624.59, 3333.39,
+			-189.94, 624.59, 3329.75, -181.90, 624.59, 3235.26,-108.12, 624.59, 3242.44,
+			-114.80, 624.59, 3417.17, -256.04, 624.59, 3486.37,-333.24, 624.59, 3631.83,
+			-519.80, 624.59, 3664.53, -505.52, 624.59, 3807.56,-181.10, 624.59, 3819.08,
+			-58.48, 624.65, 3866.03,  1185.86, 624.82, 3867.16, 1229.76, 626.74, 3909.11,
+		},
+		["25M"] = {
+			-398.01, 506.15, -41.04,  -397.94, 501.32, 185.77, -394.87, 501.32, 432.87,
+			-354.72, 503.40, 486.12,  -346.29, 528.25, 576.34, -452.48, 528.25, 575.63,
+			-452.27, 555.25, 467.82,  -348.67, 556.49, 483.02, -361.25, 582.32, 576.54,
+			-450.85, 582.92, 562.83,  -443.47, 609.32, 470.75, -390.94, 609.32, 473.53,
+			-401.14, 609.11, 610.19,  -401.89, 608.67, 846.03, -400.50, 608.67, 1261.14,
+			-399.32, 618.25, 1326.41, -400.79, 608.67, 1450.33,-365.48, 629.46, 1544.27,
+			-362.42, 610.88, 1769.88, -368.92, 617.60, 1790.20,-403.24, 608.67, 1886.37,
+			-402.33, 618.78, 1953.92, -403.73, 608.67, 2059.96,-400.77, 620.70, 2140.89,
+			-401.36, 608.67, 2234.49, -398.58, 619.29, 2313.96,-401.07, 624.61, 2411.98,
+			-400.53, 624.56, 2647.19, -401.39, 624.59, 3152.19,-402.73, 624.59, 3322.10,
+			-202.84, 624.59, 3311.41, -113.28, 624.59, 3283.08,-125.15, 624.59, 3426.17,
+			-268.75, 624.59, 3504.29, -314.82, 624.59, 3619.71,-527.62, 624.59, 3669.60,
+			-498.88, 624.59, 3780.48, -71.59, 624.65, 3853.16, -51.52, 624.65, 3866.95,
+			1210.88, 624.85, 3868.11, 1297.67, 624.89, 3866.78,1325.73, 614.96, 3865.35,
+			1335.37, 667.93, 3862.09, 1547.01, 630.47, 3796.61,1750.39, 635.66, 3947.19,
+			1953.63, 637.49, 3801.63, 2101.14, 638.53, 3964.90,2305.41, 630.33, 3866.94,
+			2383.63, 628.86, 3872.10, 2396.52, 628.86, 3872.00,2400.81, 630.69, 3888.76,
+		},
+		["40M"] = {
+			-396.08, 506.15, -36.82,  -396.12, 501.32, 191.72, -396.79, 501.32, 438.39,
+			-351.09, 503.03, 484.96,  -346.18, 528.25, 565.52, -447.25, 528.25, 565.17,
+			-444.12, 555.25, 469.77,  -337.13, 555.25, 464.23, -353.50, 582.32, 577.69,
+			-449.50, 582.32, 576.16,  -451.15, 609.32, 459.82, -396.40, 609.32, 465.93,
+			-401.26, 609.11, 612.24,  -399.69, 608.67, 855.20, -402.48, 608.67, 1274.66,
+			-400.09, 618.58, 1327.41, -399.44, 608.67, 1449.65,-366.09, 629.46, 1543.85,
+			-360.63, 607.68, 1760.19, -367.98, 618.30, 1792.33,-403.90, 608.67, 1898.76,
+			-403.08, 619.63, 1956.48, -400.79, 608.67, 2086.75,-401.50, 619.88, 2138.15,
+			-403.80, 618.00, 2310.07, -400.66, 624.61, 2415.07,-400.49, 624.56, 2651.30,
+			-400.91, 624.59, 3155.08, -403.40, 624.59, 3339.57,-119.64, 624.59, 3284.05,
+			-151.24, 624.59, 3458.09, -268.68, 624.59, 3487.22,-340.75, 624.59, 3660.40,
+			-569.89, 624.59, 3668.16, -489.55, 624.59, 3799.60,-59.35, 625.56, 3850.75,
+			1219.89, 624.85, 3866.75, 1284.32, 624.89, 3866.94,1286.06, 665.44, 3867.09,
+			2292.79, 677.94, 3879.76, 2400.52, 628.86, 3868.66,2486.91, 639.53, 3869.72,
+			2550.28, 640.78, 3869.41, 2681.08, 635.78, 3873.00,2739.68, 640.82, 3867.08,
+			2739.68, 576.78, 3867.08, 2839.74, 577.89, 3870.93,2887.44, 595.52, 3869.69,
+			2916.85, 605.82, 3871.14, 2978.85, 577.76, 3867.98,3048.89, 593.04, 3871.82,
+			3182.50, 582.81, 3875.77, 3211.69, 593.44, 3871.68,3264.79, 593.78, 3871.91,
+			3269.49, 595.78, 3888.77,
+		},
+		["60M"] = {
+			-397.33, 506.15, -35.80,  -397.35, 501.32, 188.90, -397.08, 501.32, 429.52,
+			-344.07, 509.28, 504.76,  -349.62, 528.25, 569.40, -463.72, 528.25, 568.95,
+			-463.32, 555.25, 460.69,  -336.13, 555.25, 456.17, -337.20, 582.32, 585.60,
+			-463.96, 582.32, 587.29,  -463.83, 609.32, 456.33, -389.89, 609.32, 456.22,
+			-400.12, 609.11, 611.69,  -401.23, 608.67, 841.74, -400.22, 608.67, 1262.85,
+			-401.34, 620.06, 1331.87, -401.77, 608.67, 1462.42,-363.49, 629.46, 1544.65,
+			-362.30, 629.46, 1601.72, -358.97, 606.55, 1724.01,-362.12, 618.39, 1792.98,
+			-399.98, 608.67, 1863.71, -401.84, 620.41, 1958.86,-401.36, 619.90, 2138.20,
+			-400.57, 619.99, 2316.09, -399.49, 624.61, 2412.01,-401.65, 624.56, 2651.59,
+			-399.46, 624.59, 3161.75, -403.65, 624.59, 3339.24,-95.43, 624.59, 3279.85,
+			-167.38, 624.59, 3458.25, -257.94, 624.59, 3511.95,-380.92, 624.59, 3660.42,
+			-545.07, 624.59, 3669.43, -495.24, 624.59, 3810.68,-63.71, 624.65, 3856.78,
+			1217.90, 624.85, 3868.90, 1318.72, 622.75, 3865.82,1545.85, 631.10, 3797.11,
+			1757.11, 638.47, 3948.35, 1947.14, 637.01, 3803.98,2104.09, 642.01, 3962.74,
+			2298.19, 630.28, 3867.19, 2395.77, 628.86, 3870.35,2484.46, 638.72, 3870.29,
+			2699.98, 635.78, 3871.53, 2739.82, 633.65, 3871.07,2739.82, 576.78, 3871.07,
+			2846.61, 579.41, 3870.98, 2918.92, 606.44, 3870.91,2962.88, 577.76, 3872.23,
+			3049.11, 593.12, 3870.46, 3189.61, 585.40, 3874.17,3268.12, 593.78, 3871.69,
+			3290.56, 593.78, 3872.13, 3334.82, 705.95, 3843.62,3351.97, 706.48, 5159.45,
+			4586.86, 706.48, 5144.25, 4646.06, 568.89, 5139.01,4634.53, 570.89, 5159.41,
+		},
 	}
 
+	-- ============================================================
+	-- ROUTES WORLD 3
+	-- ============================================================
 	local RAW_W3 = {
 		["300M"] = {
 			-1433.89, -159.52, -871.89, -1426.37, -154.24, -827.45, -1423.97, -124.16, -732.65,
@@ -3242,6 +1527,240 @@ local function runSpeedKeyboardEscape()
 			-1432.86, -159.32, -872.44, -1428.03, -157.01, -836.28, -1426.70, -124.44, -732.69,
 			-1429.19, -91.26, -627.20,  -1430.14, -68.39, -532.61, -1453.68, -68.39, -492.80,
 			-1455.52, -56.93, -392.63,  -1454.35, -56.14, -20.18,  -1480.98, -54.26, -15.66,
+		},
+		["800M"] = {
+			-1431.91, -158.92, -873.08, -1431.48, -155.53, -831.55, -1426.88, -124.41, -732.60,
+			-1429.44, -91.57, -628.17,  -1427.49, -68.39, -531.84, -1454.33, -68.39, -490.71,
+			-1453.24, -65.88, -428.40,  -1455.70, -56.88, -392.43, -1455.69, -55.89, -323.22,
+			-1453.33, -56.14, -8.73,    -1454.43, -55.89, 83.49,   -1454.03, 90.70, 87.25,
+			-1475.95, 91.11, 92.38,     -1474.50, 216.42, 96.89,   -1469.55, 224.45, 179.03,
+			-1468.68, 224.76, 228.53,   -1467.31, 215.87, 335.16,  -1481.27, 217.75, 331.78,
+		},
+		["1.25B"] = {
+			-1431.28, -159.52, -871.10, -1428.23, -155.12, -830.25, -1424.72, -122.48, -726.47,
+			-1424.74, -87.52, -615.22,  -1424.48, -68.39, -534.38, -1453.99, -68.39, -492.30,
+			-1453.82, -56.61, -391.32,  -1456.01, -55.89, -308.73, -1454.34, -56.14, -4.47,
+			-1454.12, -53.46, 84.69,    -1453.73, 90.70, 87.30,   -1475.20, 216.23, 98.87,
+			-1475.37, 224.47, 179.10,   -1464.36, 215.87, 351.88,  -1457.70, 215.84, 627.31,
+			-1457.70, 369.89, 627.31,   -1453.66, 361.87, 583.43,  -1354.24, 360.67, 495.31,
+			-1246.91, 335.51, 493.27,   -1240.09, 329.71, 660.76,  -1219.02, 347.41, 839.73,
+			-1369.12, 365.36, 841.68,   -1403.13, 371.52, 753.85,  -1402.78, 374.86, 724.21,
+			-1401.32, 546.36, 728.39,   -1430.47, 535.77, 759.87,
+		},
+		["2B"] = {
+			-1431.49, -159.52, -870.66, -1426.25, -155.57, -831.70, -1426.50, -124.99, -734.44,
+			-1427.32, -91.07, -626.58,  -1428.38, -68.39, -531.65, -1451.58, -68.39, -493.83,
+			-1458.05, -57.60, -395.31,  -1454.06, -55.90, 84.25,   -1453.39, 216.11, 101.03,
+			-1452.85, 224.06, 177.54,   -1454.76, 223.63, 232.80,  -1454.17, 215.87, 349.81,
+			-1453.54, 215.80, 627.38,   -1456.03, 367.37, 627.45,  -1453.96, 361.87, 610.04,
+			-1457.23, 361.87, 577.12,   -1457.51, 361.07, 498.31,  -1339.56, 361.69, 492.54,
+			-1237.99, 329.71, 680.03,   -1218.08, 346.78, 833.47,  -1364.74, 364.94, 841.81,
+			-1402.77, 374.52, 724.52,   -1402.77, 552.01, 724.52,  -1404.75, 533.88, 774.48,
+			-1403.51, 533.88, 1333.85,  -1431.49, 535.76, 1329.84,
+		},
+		["3.5B"] = {
+			-1432.42, -158.67, -873.54, -1425.42, -155.40, -831.15, -1423.45, -123.18, -729.52,
+			-1424.09, -89.99, -623.98,  -1425.54, -68.39, -533.96, -1456.70, -57.79, -396.05,
+			-1451.99, -55.89, -287.24,  -1454.36, -55.90, 83.96,   -1454.20, 216.11, 98.65,
+			-1452.87, 224.14, 177.83,   -1453.40, 224.56, 229.27,  -1452.67, 215.87, 355.44,
+			-1449.89, 215.81, 627.29,   -1450.14, 361.87, 608.74,  -1453.59, 361.07, 486.24,
+			-1327.15, 363.83, 504.57,   -1239.51, 329.71, 668.51,  -1210.96, 347.49, 842.50,
+			-1367.33, 365.19, 843.88,   -1406.65, 374.86, 726.22,  -1406.03, 553.15, 725.06,
+			-1403.44, 533.88, 762.18,   -1403.28, 533.88, 1333.28, -1404.87, 533.87, 1443.51,
+			-1442.29, 533.87, 1446.10,  -1454.47, 509.87, 1446.66, -2034.36, 509.87, 1446.50,
+			-2063.52, 445.76, 1459.55,
+		},
+		["5.5B"] = {
+			-1431.87, -158.67, -873.48, -1424.96, -152.82, -822.06, -1424.77, -121.32, -722.79,
+			-1426.29, -88.58, -618.65,  -1427.16, -68.39, -536.15, -1461.72, -57.30, -394.10,
+			-1453.87, -55.93, 84.82,    -1454.98, 216.11, 99.75,   -1453.68, 224.88, 180.66,
+			-1456.63, 223.76, 232.30,   -1452.24, 215.87, 626.62,  -1452.46, 366.93, 627.78,
+			-1452.92, 361.87, 579.11,   -1453.96, 361.07, 504.08,  -1331.20, 364.35, 514.36,
+			-1241.33, 329.71, 677.98,   -1216.42, 347.54, 844.06,  -1368.92, 365.35, 836.69,
+			-1402.75, 376.90, 724.85,   -1402.75, 539.30, 724.85,  -1405.38, 533.88, 1350.50,
+			-1404.88, 533.87, 1445.64,  -1441.26, 533.87, 1445.75, -1446.52, 509.87, 1446.35,
+			-2035.74, 509.87, 1446.68,  -2094.89, 443.87, 1481.56, -2165.62, 451.52, 1484.86,
+			-2549.40, 466.44, 1490.01,  -2697.74, 443.87, 1489.95, -2729.62, 452.05, 1487.99,
+			-2867.48, 468.49, 1486.04,  -2867.48, 521.11, 1486.04, -2928.40, 526.79, 1485.65,
+			-2928.40, 595.25, 1485.65,  -2958.89, 609.93, 1485.07, -3008.75, 603.78, 1483.10,
+			-3008.75, 668.29, 1483.10,  -3054.34, 673.39, 1488.47, -3212.13, 673.39, 1485.09,
+			-3217.26, 675.27, 1459.30,
+		},
+		["8.5B"] = {
+			-1433.02, -159.52, -869.67, -1428.59, -154.05, -826.85, -1427.78, -123.95, -731.15,
+			-1428.42, -90.20, -623.81,  -1428.93, -67.41, -522.14, -1452.20, -68.80, -440.25,
+			-1453.14, -57.08, -393.24,  -1454.25, -55.89, -267.37, -1454.18, -55.91, 84.47,
+			-1454.45, 216.11, 100.26,   -1453.58, 223.98, 177.26,  -1454.73, 224.03, 231.27,
+			-1453.55, 215.87, 626.52,   -1452.86, 365.71, 627.28,  -1454.23, 361.87, 579.40,
+			-1456.08, 361.07, 498.32,   -1336.42, 363.37, 508.42,  -1238.99, 329.71, 685.68,
+			-1218.30, 346.96, 834.93,   -1367.36, 365.20, 844.13,  -1403.20, 375.59, 724.21,
+			-1403.19, 540.90, 724.99,   -1402.99, 533.88, 761.45,  -1405.64, 533.87, 1443.05,
+			-1447.26, 509.87, 1445.79,  -2034.52, 509.87, 1446.22, -2085.23, 443.87, 1488.17,
+			-2163.88, 451.06, 1486.92,  -2359.77, 448.87, 1488.98, -2548.55, 466.12, 1490.73,
+			-2731.79, 452.62, 1489.71,  -2862.77, 452.32, 1485.76, -2933.65, 544.98, 1483.74,
+			-2940.32, 599.28, 1484.15,  -3001.40, 604.86, 1486.42, -3001.40, 672.88, 1486.42,
+			-3053.83, 673.39, 1487.86,  -3230.28, 673.39, 1484.38, -3654.96, 617.72, 1486.37,
+			-3657.42, 619.61, 1458.92,
+		},
+		["16B"] = {
+			-1431.72, -159.12, -872.69, -1428.06, -153.11, -824.02, -1426.08, -122.31, -725.91,
+			-1427.13, -88.54, -618.53,  -1426.74, -68.39, -534.98, -1452.66, -56.84, -392.25,
+			-1455.37, -55.88, 84.21,    -1453.53, 216.11, 99.57,   -1451.46, 224.36, 178.70,
+			-1453.51, 224.55, 229.31,   -1453.04, 215.84, 627.21,  -1453.04, 367.44, 627.21,
+			-1456.30, 361.87, 581.04,   -1455.61, 361.07, 492.69,  -1330.21, 364.43, 514.23,
+			-1238.15, 329.71, 685.43,   -1219.41, 347.42, 840.05,  -1369.37, 365.39, 841.88,
+			-1403.97, 377.39, 725.16,   -1402.54, 551.73, 724.95,  -1403.45, 533.88, 774.07,
+			-1405.88, 533.88, 1337.24,  -1402.31, 533.87, 1444.93, -1461.29, 509.87, 1445.25,
+			-2036.55, 509.87, 1445.69,  -2087.49, 443.87, 1486.65, -2165.76, 451.56, 1488.19,
+			-2264.04, 439.87, 1489.49,  -2344.50, 448.87, 1487.88, -2413.29, 440.20, 1489.55,
+			-2547.27, 465.65, 1490.39,  -2731.97, 452.62, 1487.08, -2850.23, 446.46, 1487.22,
+			-2850.23, 523.62, 1487.22,  -2901.95, 520.39, 1487.17, -2934.32, 527.92, 1481.75,
+			-2938.09, 595.92, 1481.87,  -2977.82, 596.39, 1482.81, -2997.56, 595.91, 1484.26,
+			-2997.56, 675.90, 1484.26,  -3050.17, 673.39, 1486.26, -3236.83, 673.39, 1485.30,
+			-3655.32, 617.72, 1486.84,  -4129.89, 617.72, 1485.43, -4130.41, 619.61, 1457.34,
+		},
+		["25B"] = {
+			-1431.31, -159.32, -872.31, -1429.99, -153.83, -826.17, -1434.67, -68.34, -540.67,
+			-1453.40, -57.19, -393.66,  -1455.61, -55.90, 84.65,   -1456.38, 216.12, 101.43,
+			-1456.07, 224.37, 178.70,   -1455.89, 224.04, 231.25,  -1458.94, 216.12, 267.89,
+			-1454.79, 215.67, 464.94,   -1454.44, 215.87, 627.58,  -1454.44, 371.15, 627.58,
+			-1453.81, 361.87, 578.47,   -1454.58, 361.07, 497.03,  -1328.32, 364.85, 517.14,
+			-1218.48, 347.46, 841.29,   -1365.69, 365.03, 842.21,  -1404.04, 374.89, 725.22,
+			-1403.50, 540.36, 724.54,   -1404.01, 533.87, 1444.92, -1455.63, 509.87, 1446.72,
+			-2035.57, 509.87, 1446.86,  -2080.43, 443.87, 1480.52, -2168.08, 452.17, 1486.14,
+			-2357.67, 448.87, 1487.47,  -2550.53, 466.77, 1490.38, -2731.52, 452.55, 1486.04,
+			-2863.78, 450.34, 1484.93,  -2863.78, 524.58, 1484.93, -2925.02, 529.89, 1485.10,
+			-2925.02, 601.39, 1485.10,  -2999.70, 596.11, 1486.59, -2999.70, 672.74, 1486.59,
+			-3053.52, 673.39, 1487.78,  -3235.87, 673.39, 1486.06, -3634.26, 617.72, 1486.90,
+			-4154.83, 617.72, 1485.66,  -4171.81, 616.57, 1485.02, -4625.86, 617.56, 1444.29,
+			-4971.36, 617.73, 1488.09,  -4968.73, 619.62, 1458.22,
+		},
+		["40B"] = {
+			-1432.21, -158.67, -873.61, -1428.62, -153.51, -825.13, -1426.02, -122.02, -724.99,
+			-1425.09, -88.67, -618.93,  -1424.79, -68.39, -536.73, -1452.83, -57.63, -395.43,
+			-1452.72, -56.01, 84.52,    -1453.85, 216.11, 100.95,  -1453.13, 224.65, 179.77,
+			-1457.74, 224.62, 229.05,   -1455.66, 215.87, 353.34,  -1454.41, 215.86, 626.87,
+			-1454.41, 367.99, 626.87,   -1456.93, 361.87, 577.47,  -1327.27, 364.87, 516.38,
+			-1241.65, 329.71, 685.19,   -1215.39, 347.40, 839.46,  -1371.24, 365.46, 837.88,
+			-1404.74, 374.88, 724.18,   -1404.74, 542.18, 724.18,  -1403.99, 533.88, 781.93,
+			-1404.26, 533.87, 1444.32,  -1449.70, 509.87, 1446.36, -2034.65, 509.87, 1446.48,
+			-2084.12, 443.87, 1487.32,  -2167.33, 451.97, 1485.82, -2362.14, 448.87, 1488.96,
+			-2547.68, 465.80, 1489.24,  -2731.44, 452.53, 1487.93, -2845.96, 448.50, 1485.86,
+			-2938.11, 519.52, 1485.11,  -2938.11, 594.82, 1485.11, -2989.22, 679.22, 1483.49,
+			-3219.92, 673.39, 1485.31,  -3660.67, 617.72, 1483.97, -4131.78, 617.72, 1485.15,
+			-4172.54, 616.59, 1484.84,  -4615.42, 616.80, 1444.20, -4967.89, 617.73, 1484.25,
+			-5073.06, 625.98, 1485.00,  -5173.10, 676.88, 1482.77, -5356.93, 735.73, 1483.69,
+			-5535.50, 794.97, 1486.48,  -5717.14, 852.74, 1486.76, -5740.81, 854.63, 1459.78,
+		},
+		["65B"] = {
+			-1431.96, -158.92, -873.16, -1426.15, -155.09, -830.16, -1429.48, -68.34, -540.94,
+			-1451.93, -57.59, -395.26,  -1453.70, -55.89, -278.98, -1453.25, -55.91, 84.79,
+			-1452.48, 216.11, 98.46,   -1452.48, 224.52, 179.30,  -1451.44, 224.41, 229.85,
+			-1452.21, 215.87, 356.37,  -1454.23, 215.85, 627.62,  -1454.23, 367.26, 627.62,
+			-1455.69, 361.87, 581.01,  -1446.29, 361.07, 485.03,  -1339.20, 363.47, 512.27,
+			-1241.68, 329.71, 682.80,  -1216.63, 347.20, 837.34,  -1368.56, 365.31, 844.51,
+			-1406.61, 374.72, 724.47,  -1406.04, 552.10, 725.04,  -1404.26, 533.88, 758.94,
+			-1402.04, 533.87, 1444.76, -1450.33, 509.87, 1446.58, -2033.83, 509.87, 1447.41,
+			-2084.75, 443.87, 1486.14, -2169.31, 452.50, 1490.18, -2546.41, 465.32, 1492.77,
+			-2727.13, 451.39, 1485.06, -2864.75, 456.90, 1486.13, -2864.75, 525.85, 1486.13,
+			-2929.10, 521.47, 1488.71, -2929.10, 597.79, 1488.71, -3011.30, 603.32, 1486.91,
+			-3011.30, 675.99, 1486.91, -3055.52, 673.39, 1484.17, -3242.61, 673.39, 1486.13,
+			-3656.64, 617.72, 1486.22, -4139.87, 617.72, 1484.30, -4607.34, 617.00, 1442.07,
+			-4829.65, 616.95, 1553.17, -4967.82, 617.73, 1484.50, -5179.13, 676.73, 1485.06,
+			-5256.07, 685.72, 1488.08, -5357.59, 735.73, 1486.86, -5434.85, 744.46, 1488.08,
+			-5534.48, 795.23, 1484.71, -5612.79, 802.92, 1484.40, -5715.81, 853.06, 1486.45,
+			-5760.78, 852.74, 1486.77, -5942.59, 851.48, 1439.41, -6076.44, 851.48, 1469.20,
+			-6294.50, 851.48, 1525.87, -6370.42, 851.48, 1448.65, -6658.79, 852.75, 1484.75,
+			-6662.08, 854.64, 1460.21,
+		},
+		["100B"] = {
+			-1432.21, -158.67, -873.61, -1428.62, -153.51, -825.13, -1426.02, -122.02, -724.99,
+			-1425.09, -88.67, -618.93,  -1424.79, -68.39, -536.73, -1452.83, -57.63, -395.43,
+			-1452.72, -56.01, 84.52,    -1453.85, 216.11, 100.95,  -1453.13, 224.65, 179.77,
+			-1457.74, 224.62, 229.05,   -1455.66, 215.87, 353.34,  -1454.41, 215.86, 626.87,
+			-1454.41, 367.99, 626.87,   -1456.93, 361.87, 577.47,  -1327.27, 364.87, 516.38,
+			-1241.65, 329.71, 685.19,   -1215.39, 347.40, 839.46,  -1371.24, 365.46, 837.88,
+			-1404.74, 374.88, 724.18,   -1404.74, 542.18, 724.18,  -1403.99, 533.88, 781.93,
+			-1404.26, 533.87, 1444.32,  -1449.70, 509.87, 1446.36, -2034.65, 509.87, 1446.48,
+			-2084.12, 443.87, 1487.32,  -2167.33, 451.97, 1485.82, -2362.14, 448.87, 1488.96,
+			-2547.68, 465.80, 1489.24,  -2731.44, 452.53, 1487.93, -2845.96, 448.50, 1485.86,
+			-2938.11, 519.52, 1485.11,  -2938.11, 594.82, 1485.11, -2989.22, 679.22, 1483.49,
+			-3219.92, 673.39, 1485.31,  -3660.67, 617.72, 1483.97, -4131.78, 617.72, 1485.15,
+			-4172.54, 616.59, 1484.84,  -4615.42, 616.80, 1444.20, -4967.89, 617.73, 1484.25,
+			-5073.06, 625.98, 1485.00,  -5173.10, 676.88, 1482.77, -5356.93, 735.73, 1483.69,
+			-5535.50, 794.97, 1486.48,  -5717.14, 852.74, 1486.76, -5740.40, 852.74, 1485.79,
+			-5862.51, 851.48, 1482.00,  -6069.16, 851.48, 1480.36, -6212.12, 851.48, 1604.95,
+			-6429.98, 851.48, 1365.79,  -6547.52, 851.48, 1481.12, -6687.09, 852.75, 1487.40,
+			-6691.49, 935.17, 1526.34,  -7278.52, 935.17, 1527.35, -7478.82, 934.84, 1615.06,
+			-7544.61, 935.17, 1679.40,  -8043.85, 935.17, 1680.06, -8156.35, 935.17, 1682.50,
+			-8315.41, 935.17, 1525.50,  -9296.99, 935.17, 1526.07, -9344.72, 852.75, 1508.12,
+			-9513.96, 852.76, 1484.80,  -9515.00, 854.64, 1458.11,
+		},
+		["200B"] = {
+			-1431.96, -158.92, -873.16, -1426.15, -155.09, -830.16, -1429.48, -68.34, -540.94,
+			-1451.93, -57.59, -395.26,  -1453.70, -55.89, -278.98, -1453.25, -55.91, 84.79,
+			-1452.48, 216.11, 98.46,   -1452.48, 224.52, 179.30,  -1451.44, 224.41, 229.85,
+			-1452.21, 215.87, 356.37,  -1454.23, 215.85, 627.62,  -1454.23, 367.26, 627.62,
+			-1455.69, 361.87, 581.01,  -1446.29, 361.07, 485.03,  -1339.20, 363.47, 512.27,
+			-1241.68, 329.71, 682.80,  -1216.63, 347.20, 837.34,  -1368.56, 365.31, 844.51,
+			-1406.61, 374.72, 724.47,  -1406.04, 552.10, 725.04,  -1404.26, 533.88, 758.94,
+			-1402.04, 533.87, 1444.76, -1450.33, 509.87, 1446.58, -2033.83, 509.87, 1447.41,
+			-2084.75, 443.87, 1486.14, -2169.31, 452.50, 1490.18, -2546.41, 465.32, 1492.77,
+			-2727.13, 451.39, 1485.06, -2864.75, 456.90, 1486.13, -2864.75, 525.85, 1486.13,
+			-2929.10, 521.47, 1488.71, -2929.10, 597.79, 1488.71, -3011.30, 603.32, 1486.91,
+			-3011.30, 675.99, 1486.91, -3055.52, 673.39, 1484.17, -3242.61, 673.39, 1486.13,
+			-3656.64, 617.72, 1486.22, -4139.87, 617.72, 1484.30, -4607.34, 617.00, 1442.07,
+			-4829.65, 616.95, 1553.17, -4967.82, 617.73, 1484.50, -5179.13, 676.73, 1485.06,
+			-5256.07, 685.72, 1488.08, -5357.59, 735.73, 1486.86, -5434.85, 744.46, 1488.08,
+			-5534.48, 795.23, 1484.71, -5612.79, 802.92, 1484.40, -5715.81, 853.06, 1486.45,
+			-5760.78, 852.74, 1486.77, -5942.59, 851.48, 1439.41, -6076.44, 851.48, 1469.20,
+			-6294.50, 851.48, 1525.87, -6370.42, 851.48, 1448.65, -6658.79, 852.75, 1484.75,
+			-6688.07, 852.90, 1522.44, -6693.09, 935.17, 1527.54, -7274.96, 935.17, 1526.68,
+			-7463.34, 935.17, 1597.91, -7544.07, 935.17, 1679.60, -8044.28, 934.65, 1679.06,
+			-8158.95, 935.17, 1680.90, -8315.85, 935.17, 1526.05, -9297.00, 935.17, 1525.68,
+			-9383.17, 852.75, 1497.72, -9513.67, 852.76, 1484.61, -9616.35, 860.15, 1486.68,
+			-9815.02, 861.33, 1486.92, -9956.88, 852.76, 1489.17, -10152.35, 852.76, 1478.86,
+			-10207.42, 860.86, 1481.97, -10352.44, 852.76, 1488.02,-10402.05, 861.58, 1485.28,
+			-10511.38, 852.76, 1489.48, -10704.16, 861.09, 1493.10,-10804.40, 852.75, 1484.35,
+			-10806.13, 854.64, 1459.29,
+		},
+		["1T"] = {
+			-1431.96, -158.92, -873.16, -1426.15, -155.09, -830.16, -1429.48, -68.34, -540.94,
+			-1451.93, -57.59, -395.26,  -1453.70, -55.89, -278.98, -1453.25, -55.91, 84.79,
+			-1452.48, 216.11, 98.46,   -1452.48, 224.52, 179.30,  -1451.44, 224.41, 229.85,
+			-1452.21, 215.87, 356.37,  -1454.23, 215.85, 627.62,  -1454.23, 367.26, 627.62,
+			-1455.69, 361.87, 581.01,  -1446.29, 361.07, 485.03,  -1339.20, 363.47, 512.27,
+			-1241.68, 329.71, 682.80,  -1216.63, 347.20, 837.34,  -1368.56, 365.31, 844.51,
+			-1406.61, 374.72, 724.47,  -1406.04, 552.10, 725.04,  -1404.26, 533.88, 758.94,
+			-1402.04, 533.87, 1444.76, -1450.33, 509.87, 1446.58, -2033.83, 509.87, 1447.41,
+			-2084.75, 443.87, 1486.14, -2169.31, 452.50, 1490.18, -2546.41, 465.32, 1492.77,
+			-2727.13, 451.39, 1485.06, -2864.75, 456.90, 1486.13, -2864.75, 525.85, 1486.13,
+			-2929.10, 521.47, 1488.71, -2929.10, 597.79, 1488.71, -3011.30, 603.32, 1486.91,
+			-3011.30, 675.99, 1486.91, -3055.52, 673.39, 1484.17, -3242.61, 673.39, 1486.13,
+			-3656.64, 617.72, 1486.22, -4139.87, 617.72, 1484.30, -4607.34, 617.00, 1442.07,
+			-4829.65, 616.95, 1553.17, -4967.82, 617.73, 1484.50, -5179.13, 676.73, 1485.06,
+			-5256.07, 685.72, 1488.08, -5357.59, 735.73, 1486.86, -5434.85, 744.46, 1488.08,
+			-5534.48, 795.23, 1484.71, -5612.79, 802.92, 1484.40, -5715.81, 853.06, 1486.45,
+			-5760.78, 852.74, 1486.77, -5942.59, 851.48, 1439.41, -6076.44, 851.48, 1469.20,
+			-6294.50, 851.48, 1525.87, -6370.42, 851.48, 1448.65, -6658.79, 852.75, 1484.75,
+			-6688.07, 852.90, 1522.44, -6693.09, 935.17, 1527.54, -7274.96, 935.17, 1526.68,
+			-7463.34, 935.17, 1597.91, -7544.07, 935.17, 1679.60, -8044.28, 934.65, 1679.06,
+			-8158.95, 935.17, 1680.90, -8315.85, 935.17, 1526.05, -9297.00, 935.17, 1525.68,
+			-9383.17, 852.75, 1497.72, -9513.67, 852.76, 1484.61, -9616.35, 860.15, 1486.68,
+			-9815.02, 861.33, 1486.92, -9956.88, 852.76, 1489.17, -10152.35, 852.76, 1478.86,
+			-10207.42, 860.86, 1481.97, -10352.44, 852.76, 1488.02,-10402.05, 861.58, 1485.28,
+			-10511.38, 852.76, 1489.48, -10704.16, 861.09, 1493.10,-10804.40, 852.75, 1484.35,
+			-10807.14, 852.75, 1484.99, -10832.41, 852.75, 1521.11,-10832.41, 992.81, 1521.11,
+			-10906.71, 850.74, 1484.42, -12578.12, 850.63, 1487.01,-12609.93, 850.63, 1449.07,
+			-12875.68, 897.62, 1443.87,-13377.35, 987.81, 1445.84,-13683.93, 1027.44, 1449.26,
+			-14334.57, 1029.46, 1458.59,-14508.47, 1041.37, 1486.16,-14878.42, 1042.12, 1503.89,
+			-15250.37, 1043.28, 1486.07,-15409.18, 1029.46, 1485.63,-15845.32, 1015.44, 1486.26,
+			-17176.03, 1015.45, 1493.41,-17416.55, 1015.43, 1734.10,-17869.25, 1015.43, 1261.14,
+			-18345.84, 1015.43, 1744.44,-18793.70, 1015.43, 1268.23,-19052.30, 1015.45, 1518.14,
+			-19214.49, 1015.45, 1517.26,-19546.52, 953.54, 1585.88,-19874.57, 898.67, 1413.42,
+			-20207.19, 844.81, 1594.38,-20566.63, 782.59, 1428.02,-20952.81, 733.79, 1519.97,
+			-21346.33, 735.41, 1515.16,-21548.93, 721.93, 1519.85,-22096.87, 672.25, 1518.28,
+			-23275.21, 674.64, 1516.50,
 		},
 	}
 
@@ -3260,8 +1779,8 @@ local function runSpeedKeyboardEscape()
 	local ROUTES_W2 = buildRoutes(RAW_W2)
 	local ROUTES_W3 = buildRoutes(RAW_W3)
 
-	local ROUTE_ORDER_W2 = { "150K", "400K", "600K", "1M" }
-	local ROUTE_ORDER_W3 = { "300M", "500M" }
+	local ROUTE_ORDER_W2 = { "150K", "400K", "600K", "1M", "1.5M", "2.5M", "4M", "6M", "10M", "15M", "25M", "40M", "60M" }
+	local ROUTE_ORDER_W3 = { "300M", "500M", "800M", "1.25B", "2B", "3.5B", "5.5B", "8.5B", "16B", "25B", "40B", "65B", "100B", "200B", "1T" }
 
 	local function makeFarmModule(routes, defaultRoute)
 		local state = {
@@ -3650,1437 +2169,6 @@ local function runSpeedKeyboardEscape()
 	})
 
 	WindUI:Notify({ Title = "⚡ POTENT HUB", Content = "✅ +1 Speed Keyboard Escape loaded!", Duration = 4 })
-end
-
--- ============================================================
--- ========== JUEGO 6: ONE TAP ==========
--- ============================================================
-local function runOneTap()
-	local LocalPlayer = playersService.LocalPlayer
-
-	--// Helpers
-	local function deepCopy(value)
-		if type(value) ~= "table" then return value end
-		local result = {}
-		for key, item in pairs(value) do
-			result[deepCopy(key)] = deepCopy(item)
-		end
-		return result
-	end
-
-	local function currentCamera()
-		return workspace.CurrentCamera
-	end
-
-	local function screenCenter()
-		local camera = currentCamera()
-		local viewport = camera and camera.ViewportSize or Vector2.new(1280, 720)
-		return Vector2.new(viewport.X * 0.5, viewport.Y * 0.5)
-	end
-
-	local function normalizeAutoShootButton(value)
-		value = tostring(value or "RMB"):upper()
-		return value == "LMB" and "LMB" or "RMB"
-	end
-
-	local DefaultConfig = {
-		AimMode = "Custom",
-		Aim = {
-			Enabled = false,
-			HoldRMB = true,
-			AimPoint = "Head",
-			AutoShoot = false,
-			AutoShootButton = "RMB",
-			AutoShootRadius = 8,
-			AutoShootDelay = 0.00,
-			FOV = 180,
-			SmoothSpeed = 40,
-			MaxDistance = 1500,
-			StickyTarget = false,
-			StickyMultiplier = 1.35,
-			Prediction = false,
-			BulletSpeed = 3850,
-			PredictionExtra = 0.00,
-			PredictionSmoothing = 0.72,
-			MaxPredictionOffset = 18,
-			AdaptiveSmoothing = false,
-			MicroSnapRadius = 1.5,
-			TargetPriority = "Hybrid",
-			SwitchDelay = 0.05,
-			SwitchThreshold = 0.10,
-			LockGrace = 0.16,
-			ShowFOV = false,
-		},
-		ESP = {
-			Enabled = false,
-			Boxes = false,
-			Names = false,
-			Health = false,
-			Distance = false,
-			Tracers = false,
-			Chams = false,
-			MaxDistance = 1500,
-		},
-	}
-
-	local Config = deepCopy(DefaultConfig)
-
-	--// Runtime Integration
-	local NativeWeaponClient = nil
-	local NativeWeaponStatus = "Not scanned"
-
-	local function resolveNativeWeaponClient()
-		NativeWeaponClient = nil
-		NativeWeaponStatus = "Native WeaponClient unavailable • mouse fallback"
-
-		local playerScripts = LocalPlayer and LocalPlayer:FindFirstChild("PlayerScripts")
-		local startScript = playerScripts and playerScripts:FindFirstChild("Start")
-		local gameFolder = startScript and startScript:FindFirstChild("Game")
-		local module = gameFolder and gameFolder:FindFirstChild("WeaponClient")
-
-		if not (module and module:IsA("ModuleScript")) then
-			return false
-		end
-
-		local okRequire, result = pcall(require, module)
-		if okRequire and type(result) == "table" and type(result.fire) == "function" then
-			NativeWeaponClient = result
-			NativeWeaponStatus = "Native WeaponClient.fire ready"
-			return true
-		end
-
-		return false
-	end
-
-	resolveNativeWeaponClient()
-
-	local function localCharacter()
-		return LocalPlayer and LocalPlayer.Character or nil
-	end
-
-	local function localCombatReady()
-		local character = localCharacter()
-		if not character or not character.Parent then
-			return false
-		end
-		local humanoid = character:FindFirstChildOfClass("Humanoid")
-		if not humanoid or humanoid.Health <= 0 then
-			return false
-		end
-		if character:GetAttribute("deployed") ~= true then
-			return false
-		end
-		return true
-	end
-
-	local function isMouseHeld(button)
-		local inputType = button == "LMB"
-			and Enum.UserInputType.MouseButton1
-			or Enum.UserInputType.MouseButton2
-		local ok, held = pcall(function()
-			return userInputService:IsMouseButtonPressed(inputType)
-		end)
-		return ok and held or false
-	end
-
-	local function aimActive()
-		if not Config.Aim.Enabled or not localCombatReady() then
-			return false
-		end
-		if Config.Aim.HoldRMB then
-			return isMouseHeld("RMB")
-		end
-		return true
-	end
-
-	local function autoShootActive()
-		if not Config.Aim.AutoShoot or not localCombatReady() then
-			return false
-		end
-		return isMouseHeld(normalizeAutoShootButton(Config.Aim.AutoShootButton))
-	end
-
-	local function isEnemyCharacter(character)
-		if not character or character == localCharacter() or not character.Parent then
-			return false
-		end
-		if not collectionService:HasTag(character, "Character") then
-			return false
-		end
-		local humanoid = character:FindFirstChildOfClass("Humanoid")
-		if not humanoid or humanoid.Health <= 0 then
-			return false
-		end
-		if character:FindFirstChildOfClass("ForceField") then
-			return false
-		end
-		return true
-	end
-
-	local function iterateEnemies(callback)
-		for _, character in ipairs(collectionService:GetTagged("Character")) do
-			if isEnemyCharacter(character) then
-				callback(character)
-			end
-		end
-	end
-
-	local function getPlayerFromCharacter(character)
-		local ok, player = pcall(playersService.GetPlayerFromCharacter, playersService, character)
-		return ok and player or nil
-	end
-
-	local function getDisplayName(character)
-		local player = getPlayerFromCharacter(character)
-		if player then
-			if player.DisplayName and player.DisplayName ~= "" then
-				return player.DisplayName
-			end
-			return player.Name
-		end
-		return character and character.Name or "Enemy"
-	end
-
-	local function getHealth(character)
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		if not humanoid then
-			return 0, 100
-		end
-		return humanoid.Health, math.max(humanoid.MaxHealth, 1)
-	end
-
-	local function worldToScreen(position)
-		local camera = currentCamera()
-		if not camera then
-			return Vector2.zero, false, -1
-		end
-		local point, onScreen = camera:WorldToViewportPoint(position)
-		return Vector2.new(point.X, point.Y), onScreen and point.Z > 0, point.Z
-	end
-
-	local function getCandidateParts(character)
-		local parts = {}
-		local names = {
-			"Head", "Hitbox_Head", "Torso", "UpperTorso", "LowerTorso", "HumanoidRootPart",
-		}
-		local seen = {}
-		for _, name in ipairs(names) do
-			local part = character:FindFirstChild(name)
-			if part and part:IsA("BasePart") and not seen[part] then
-				seen[part] = true
-				table.insert(parts, part)
-			end
-		end
-		return parts
-	end
-
-	local function getAimPart(character)
-		local mode = tostring(Config.Aim.AimPoint or "Head")
-
-		if mode == "Head" then
-			local part = character:FindFirstChild("Head") or character:FindFirstChild("Hitbox_Head")
-			if part and part:IsA("BasePart") then
-				return part
-			end
-		elseif mode == "Torso" then
-			local part = character:FindFirstChild("Torso")
-				or character:FindFirstChild("UpperTorso")
-				or character:FindFirstChild("HumanoidRootPart")
-			if part and part:IsA("BasePart") then
-				return part
-			end
-		elseif mode == "Closest Part" then
-			local center = screenCenter()
-			local bestPart = nil
-			local bestDistance = math.huge
-			for _, part in ipairs(getCandidateParts(character)) do
-				local screen, onScreen = worldToScreen(part.Position)
-				if onScreen then
-					local distance = (screen - center).Magnitude
-					if distance < bestDistance then
-						bestDistance = distance
-						bestPart = part
-					end
-				end
-			end
-			if bestPart then
-				return bestPart
-			end
-		end
-
-		local fallback = character:FindFirstChild("Torso")
-			or character:FindFirstChild("HumanoidRootPart")
-			or character:FindFirstChild("Head")
-		return fallback and fallback:IsA("BasePart") and fallback or nil
-	end
-
-	local velocityCache = setmetatable({}, {__mode = "k"})
-
-	local function getSmoothedVelocity(character, part)
-		local raw = part and part.AssemblyLinearVelocity or Vector3.zero
-		local entry = velocityCache[character]
-		local smoothing = math.clamp(tonumber(Config.Aim.PredictionSmoothing) or 0, 0, 0.98)
-		if not entry then
-			entry = {Velocity = raw}
-			velocityCache[character] = entry
-			return raw
-		end
-		entry.Velocity = entry.Velocity:Lerp(raw, 1 - smoothing)
-		return entry.Velocity
-	end
-
-	local function predictPosition(character, part, rawPosition, worldDistance)
-		if not Config.Aim.Prediction then
-			return rawPosition
-		end
-		local bulletSpeed = math.max(tonumber(Config.Aim.BulletSpeed) or 3850, 100)
-		local extra = math.clamp(tonumber(Config.Aim.PredictionExtra) or 0, 0, 0.25)
-		local travelTime = math.clamp(worldDistance / bulletSpeed + extra, 0, 0.35)
-		local velocity = getSmoothedVelocity(character, part)
-		local offset = velocity * travelTime
-		local maxOffset = math.max(tonumber(Config.Aim.MaxPredictionOffset) or 0, 0)
-		if maxOffset > 0 and offset.Magnitude > maxOffset then
-			offset = offset.Unit * maxOffset
-		end
-		return rawPosition + offset
-	end
-
-	local function isVisible(character, position)
-		local camera = currentCamera()
-		local localChar = localCharacter()
-		if not camera or not localChar then
-			return false
-		end
-		local ignore = {localChar, character}
-		local effects = workspace:FindFirstChild("Effects")
-		if effects then
-			table.insert(ignore, effects)
-		end
-		local viewmodel = camera:FindFirstChildWhichIsA("Model")
-		if viewmodel then
-			table.insert(ignore, viewmodel)
-		end
-		local ok, obscuring = pcall(function()
-			return camera:GetPartsObscuringTarget({position}, ignore)
-		end)
-		return ok and #obscuring == 0
-	end
-
-	local lockedTarget = nil
-	local lockedTargetLastInfo = nil
-	local lockedTargetLastValidAt = 0
-	local lastTargetSwitchAt = 0
-
-	local function scoreTarget(screenDistance, worldDistance, health, maxHealth)
-		local fov = math.max(tonumber(Config.Aim.FOV) or 1, 1)
-		local maxDistance = math.max(tonumber(Config.Aim.MaxDistance) or 1, 1)
-		local screenNorm = math.clamp(screenDistance / fov, 0, 2)
-		local worldNorm = math.clamp(worldDistance / maxDistance, 0, 2)
-		local healthNorm = math.clamp(health / math.max(maxHealth, 1), 0, 1)
-		local priority = tostring(Config.Aim.TargetPriority or "Hybrid")
-		if priority == "Distance" then
-			return worldNorm
-		elseif priority == "Low Health" then
-			return healthNorm + screenNorm * 0.15
-		elseif priority == "Crosshair" then
-			return screenNorm
-		end
-		return screenNorm * 0.72 + worldNorm * 0.18 + healthNorm * 0.10
-	end
-
-	local function targetInfo(character, fovMultiplier)
-		if not isEnemyCharacter(character) then
-			return nil
-		end
-		local camera = currentCamera()
-		if not camera then
-			return nil
-		end
-		local part = getAimPart(character)
-		if not part then
-			return nil
-		end
-		local rawPosition = part.Position
-		local worldDistance = (rawPosition - camera.CFrame.Position).Magnitude
-		if worldDistance > math.max(tonumber(Config.Aim.MaxDistance) or 0, 1) then
-			return nil
-		end
-		local position = predictPosition(character, part, rawPosition, worldDistance)
-		local screenPosition, onScreen = worldToScreen(position)
-		if not onScreen then
-			return nil
-		end
-		local screenDistance = (screenPosition - screenCenter()).Magnitude
-		local allowedFOV = math.max(tonumber(Config.Aim.FOV) or 0, 1) * (fovMultiplier or 1)
-		if screenDistance > allowedFOV then
-			return nil
-		end
-		if not isVisible(character, position) then
-			return nil
-		end
-		local health, maxHealth = getHealth(character)
-		return {
-			Entity = character,
-			Part = part,
-			RawPosition = rawPosition,
-			Position = position,
-			ScreenPosition = screenPosition,
-			ScreenDistance = screenDistance,
-			WorldDistance = worldDistance,
-			Health = health,
-			MaxHealth = maxHealth,
-			Score = scoreTarget(screenDistance, worldDistance, health, maxHealth),
-		}
-	end
-
-	local function clearTarget()
-		lockedTarget = nil
-		lockedTargetLastInfo = nil
-		lockedTargetLastValidAt = 0
-	end
-
-	local function acquireTarget()
-		local now = os.clock()
-		local stickyScale = Config.Aim.StickyTarget
-			and math.max(tonumber(Config.Aim.StickyMultiplier) or 1, 1)
-			or 1
-
-		local lockedInfo = nil
-		if lockedTarget then
-			lockedInfo = targetInfo(lockedTarget, stickyScale)
-			if lockedInfo then
-				lockedTargetLastInfo = lockedInfo
-				lockedTargetLastValidAt = now
-			end
-		end
-
-		local bestInfo = nil
-		iterateEnemies(function(character)
-			local info = targetInfo(character, 1)
-			if info and (not bestInfo or info.Score < bestInfo.Score) then
-				bestInfo = info
-			end
-		end)
-
-		if not lockedTarget then
-			if bestInfo then
-				lockedTarget = bestInfo.Entity
-				lockedTargetLastInfo = bestInfo
-				lockedTargetLastValidAt = now
-				lastTargetSwitchAt = now
-			end
-			return bestInfo
-		end
-
-		if lockedInfo then
-			if not bestInfo or bestInfo.Entity == lockedTarget then
-				return lockedInfo
-			end
-
-			if not Config.Aim.StickyTarget then
-				lockedTarget = bestInfo.Entity
-				lockedTargetLastInfo = bestInfo
-				lockedTargetLastValidAt = now
-				lastTargetSwitchAt = now
-				return bestInfo
-			end
-
-			local switchDelay = math.max(tonumber(Config.Aim.SwitchDelay) or 0, 0)
-			if now - lastTargetSwitchAt < switchDelay then
-				return lockedInfo
-			end
-
-			local threshold = math.clamp(tonumber(Config.Aim.SwitchThreshold) or 0, 0, 0.95)
-			local requiredScore = lockedInfo.Score * (1 - threshold)
-			if bestInfo.Score < requiredScore then
-				lockedTarget = bestInfo.Entity
-				lockedTargetLastInfo = bestInfo
-				lockedTargetLastValidAt = now
-				lastTargetSwitchAt = now
-				return bestInfo
-			end
-
-			return lockedInfo
-		end
-
-		local grace = math.max(tonumber(Config.Aim.LockGrace) or 0, 0)
-		if lockedTargetLastInfo and isEnemyCharacter(lockedTarget)
-			and now - lockedTargetLastValidAt <= grace
-		then
-			return lockedTargetLastInfo
-		end
-
-		if bestInfo then
-			lockedTarget = bestInfo.Entity
-			lockedTargetLastInfo = bestInfo
-			lockedTargetLastValidAt = now
-			lastTargetSwitchAt = now
-			return bestInfo
-		end
-
-		clearTarget()
-		return nil
-	end
-
-	local lastAutoShootTarget = nil
-	local lastAutoShotAttemptAt = 0
-	local lastAutoShotAt = 0
-
-	local function fireNativeOrFallback()
-		if not NativeWeaponClient then
-			resolveNativeWeaponClient()
-		end
-		if NativeWeaponClient and type(NativeWeaponClient.fire) == "function" then
-			local ok = pcall(NativeWeaponClient.fire)
-			if ok then
-				return true
-			end
-			NativeWeaponClient = nil
-		end
-		if type(mouse1click) == "function" then
-			return pcall(mouse1click)
-		end
-		return false
-	end
-
-	local function tryAutoShoot(info)
-		if not autoShootActive() or not info or not info.Entity then
-			return
-		end
-		if lockedTarget ~= info.Entity or not isEnemyCharacter(info.Entity) then
-			return
-		end
-		local fresh = targetInfo(info.Entity, math.max(tonumber(Config.Aim.StickyMultiplier) or 1, 1))
-		if not fresh then
-			return
-		end
-		local screenPosition, onScreen = worldToScreen(fresh.Position)
-		if not onScreen then
-			return
-		end
-		local errorPixels = (screenPosition - screenCenter()).Magnitude
-		local radius = math.clamp(tonumber(Config.Aim.AutoShootRadius) or 8, 1, 50)
-		if errorPixels > radius then
-			return
-		end
-		local now = os.clock()
-		local delay = math.max(tonumber(Config.Aim.AutoShootDelay) or 0, 0)
-		if lastAutoShootTarget ~= info.Entity then
-			lastAutoShootTarget = info.Entity
-			lastAutoShotAttemptAt = 0
-		end
-		if now - lastAutoShotAttemptAt < math.max(delay, 0.02) then
-			return
-		end
-		lastAutoShotAttemptAt = now
-		if fireNativeOrFallback() then
-			lastAutoShotAt = now
-		end
-	end
-
-	local function applyAim(dt)
-		local shouldAim = aimActive()
-		local shouldShoot = autoShootActive()
-
-		if not shouldAim and not shouldShoot then
-			if not localCombatReady() or (not Config.Aim.Enabled and not Config.Aim.AutoShoot) then
-				clearTarget()
-			end
-			return
-		end
-
-		local info = acquireTarget()
-		if not info then
-			return
-		end
-
-		local camera = currentCamera()
-		if not camera then
-			return
-		end
-
-		if shouldAim then
-			local current = camera.CFrame
-			local desired = CFrame.lookAt(current.Position, info.Position)
-			local speed = math.max(tonumber(Config.Aim.SmoothSpeed) or 0.01, 0.01)
-
-			if Config.Aim.AdaptiveSmoothing then
-				local normalized = math.clamp(info.ScreenDistance / math.max(Config.Aim.FOV, 1), 0, 1)
-				speed = speed * (0.58 + math.sqrt(normalized) * 1.42)
-			end
-
-			local snapRadius = math.max(tonumber(Config.Aim.MicroSnapRadius) or 0, 0)
-			local alpha = 1 - math.exp(-speed * math.max(dt, 0))
-			if snapRadius > 0 and info.ScreenDistance <= snapRadius then
-				alpha = 1
-			end
-
-			camera.CFrame = current:Lerp(desired, math.clamp(alpha, 0, 1))
-		end
-
-		if shouldShoot then
-			tryAutoShoot(info)
-		end
-	end
-
-	--// ESP / Overlay
-	local function getOverlayParent()
-		if type(gethui) == "function" then
-			local ok, parent = pcall(gethui)
-			if ok and typeof(parent) == "Instance" then
-				return parent
-			end
-		end
-		local okCore = pcall(function() return coreGui.Name end)
-		if okCore then
-			return coreGui
-		end
-		return LocalPlayer:WaitForChild("PlayerGui")
-	end
-
-	local OverlayParent = getOverlayParent()
-	local oldOverlay = OverlayParent:FindFirstChild("POTENT_Overlay")
-	if oldOverlay then
-		oldOverlay:Destroy()
-	end
-
-	local ScreenGui = Instance.new("ScreenGui")
-	ScreenGui.Name = "POTENT_Overlay"
-	ScreenGui.ResetOnSpawn = false
-	ScreenGui.IgnoreGuiInset = true
-	ScreenGui.DisplayOrder = 999999
-	ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-	ScreenGui.Parent = OverlayParent
-
-	local OverlayFolder = Instance.new("Frame")
-	OverlayFolder.Name = "ESP"
-	OverlayFolder.Size = UDim2.fromScale(1, 1)
-	OverlayFolder.BackgroundTransparency = 1
-	OverlayFolder.BorderSizePixel = 0
-	OverlayFolder.Parent = ScreenGui
-
-	local espObjects = {}
-
-	local function makeStroke(parent, thickness)
-		local stroke = Instance.new("UIStroke")
-		stroke.Thickness = thickness or 1
-		stroke.Color = Color3.fromRGB(255, 78, 78)
-		stroke.Transparency = 0
-		stroke.Parent = parent
-		return stroke
-	end
-
-	local function makeText(parent)
-		local label = Instance.new("TextLabel")
-		label.BackgroundTransparency = 1
-		label.BorderSizePixel = 0
-		label.Font = Enum.Font.GothamMedium
-		label.TextColor3 = Color3.fromRGB(255, 255, 255)
-		label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-		label.TextStrokeTransparency = 0.35
-		label.TextSize = 13
-		label.ZIndex = 10
-		label.Parent = parent
-		return label
-	end
-
-	local function createESP(character)
-		if espObjects[character] then
-			return espObjects[character]
-		end
-
-		local holder = Instance.new("Frame")
-		holder.Name = "EntityESP"
-		holder.BackgroundTransparency = 1
-		holder.BorderSizePixel = 0
-		holder.Visible = false
-		holder.ZIndex = 5
-		holder.Parent = OverlayFolder
-
-		local box = Instance.new("Frame")
-		box.Name = "Box"
-		box.BackgroundTransparency = 1
-		box.BorderSizePixel = 0
-		box.Size = UDim2.fromScale(1, 1)
-		box.ZIndex = 5
-		box.Parent = holder
-		local boxStroke = makeStroke(box, 1.5)
-
-		local nameLabel = makeText(holder)
-		nameLabel.Name = "Name"
-		nameLabel.AnchorPoint = Vector2.new(0.5, 1)
-		nameLabel.Position = UDim2.new(0.5, 0, 0, -3)
-		nameLabel.Size = UDim2.new(1.8, 0, 0, 18)
-		nameLabel.TextXAlignment = Enum.TextXAlignment.Center
-
-		local infoLabel = makeText(holder)
-		infoLabel.Name = "Info"
-		infoLabel.AnchorPoint = Vector2.new(0.5, 0)
-		infoLabel.Position = UDim2.new(0.5, 0, 1, 3)
-		infoLabel.Size = UDim2.new(1.9, 0, 0, 18)
-		infoLabel.TextXAlignment = Enum.TextXAlignment.Center
-
-		local hpBack = Instance.new("Frame")
-		hpBack.Name = "HealthBack"
-		hpBack.AnchorPoint = Vector2.new(1, 0)
-		hpBack.Position = UDim2.new(0, -4, 0, 0)
-		hpBack.Size = UDim2.new(0, 4, 1, 0)
-		hpBack.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
-		hpBack.BorderSizePixel = 0
-		hpBack.ZIndex = 6
-		hpBack.Parent = holder
-
-		local hpFill = Instance.new("Frame")
-		hpFill.Name = "Health"
-		hpFill.AnchorPoint = Vector2.new(0, 1)
-		hpFill.Position = UDim2.new(0, 0, 1, 0)
-		hpFill.Size = UDim2.fromScale(1, 1)
-		hpFill.BackgroundColor3 = Color3.fromRGB(85, 255, 110)
-		hpFill.BorderSizePixel = 0
-		hpFill.ZIndex = 7
-		hpFill.Parent = hpBack
-
-		local tracer = Instance.new("Frame")
-		tracer.Name = "Tracer"
-		tracer.AnchorPoint = Vector2.new(0, 0.5)
-		tracer.BackgroundColor3 = Color3.fromRGB(255, 78, 78)
-		tracer.BorderSizePixel = 0
-		tracer.Size = UDim2.fromOffset(0, 1)
-		tracer.Visible = false
-		tracer.ZIndex = 3
-		tracer.Parent = OverlayFolder
-
-		local highlight = Instance.new("Highlight")
-		highlight.Name = "POTENT_Highlight"
-		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-		highlight.FillColor = Color3.fromRGB(255, 60, 60)
-		highlight.FillTransparency = 0.82
-		highlight.OutlineColor = Color3.fromRGB(255, 115, 115)
-		highlight.OutlineTransparency = 0
-		highlight.Enabled = false
-		highlight.Parent = workspace
-
-		local object = {
-			Holder = holder,
-			Box = box,
-			BoxStroke = boxStroke,
-			Name = nameLabel,
-			Info = infoLabel,
-			HealthBack = hpBack,
-			HealthFill = hpFill,
-			Tracer = tracer,
-			Highlight = highlight,
-		}
-
-		espObjects[character] = object
-		return object
-	end
-
-	local function hideESPObject(object)
-		if not object then return end
-		object.Holder.Visible = false
-		object.Tracer.Visible = false
-		object.Highlight.Enabled = false
-	end
-
-	local function removeESP(character)
-		local object = espObjects[character]
-		if not object then return end
-		for _, instance in pairs(object) do
-			if typeof(instance) == "Instance" then
-				pcall(function() instance:Destroy() end)
-			end
-		end
-		espObjects[character] = nil
-	end
-
-	local function getBounds(character)
-		if not character or not character:IsA("Model") then
-			return nil
-		end
-		local ok, cf, size = pcall(character.GetBoundingBox, character)
-		if not ok or typeof(cf) ~= "CFrame" or typeof(size) ~= "Vector3" then
-			return nil
-		end
-		size = size + Vector3.new(0.25, 0.35, 0.25)
-		local half = size * 0.5
-		local corners = {
-			Vector3.new(-half.X, -half.Y, -half.Z),
-			Vector3.new(-half.X, -half.Y,  half.Z),
-			Vector3.new(-half.X,  half.Y, -half.Z),
-			Vector3.new(-half.X,  half.Y,  half.Z),
-			Vector3.new( half.X, -half.Y, -half.Z),
-			Vector3.new( half.X, -half.Y,  half.Z),
-			Vector3.new( half.X,  half.Y, -half.Z),
-			Vector3.new( half.X,  half.Y,  half.Z),
-		}
-		local minX, minY = math.huge, math.huge
-		local maxX, maxY = -math.huge, -math.huge
-		local anyInFront = false
-		local camera = currentCamera()
-		if not camera then
-			return nil
-		end
-		for _, localCorner in ipairs(corners) do
-			local worldCorner = cf:PointToWorldSpace(localCorner)
-			local point = camera:WorldToViewportPoint(worldCorner)
-			if point.Z > 0 then
-				anyInFront = true
-				minX = math.min(minX, point.X)
-				minY = math.min(minY, point.Y)
-				maxX = math.max(maxX, point.X)
-				maxY = math.max(maxY, point.Y)
-			end
-		end
-		if not anyInFront or minX == math.huge then
-			return nil
-		end
-		local width = maxX - minX
-		local height = maxY - minY
-		if width < 2 or height < 2 then
-			return nil
-		end
-		return minX, minY, width, height
-	end
-
-	local function updateTracer(frame, from, to)
-		local delta = to - from
-		frame.Position = UDim2.fromOffset(from.X, from.Y)
-		frame.Size = UDim2.fromOffset(delta.Magnitude, 1)
-		frame.Rotation = math.deg(math.atan2(delta.Y, delta.X))
-	end
-
-	local function updateESP()
-		if not Config.ESP.Enabled or not localCombatReady() then
-			for _, object in pairs(espObjects) do
-				hideESPObject(object)
-			end
-			return
-		end
-		local camera = currentCamera()
-		if not camera then
-			return
-		end
-		local seen = {}
-		iterateEnemies(function(character)
-			seen[character] = true
-			local part = getAimPart(character)
-				or character:FindFirstChild("HumanoidRootPart")
-				or character:FindFirstChild("Torso")
-				or character:FindFirstChild("Head")
-			if not (part and part:IsA("BasePart")) then
-				local old = espObjects[character]
-				if old then hideESPObject(old) end
-				return
-			end
-			local distance = (part.Position - camera.CFrame.Position).Magnitude
-			if distance > math.max(tonumber(Config.ESP.MaxDistance) or 1, 1) then
-				local old = espObjects[character]
-				if old then hideESPObject(old) end
-				return
-			end
-			local object = createESP(character)
-			local minX, minY, width, height = getBounds(character)
-			local locked = character == lockedTarget
-			local mainColor = locked
-				and Color3.fromRGB(100, 255, 125)
-				or Color3.fromRGB(255, 78, 78)
-			object.BoxStroke.Color = mainColor
-			object.Tracer.BackgroundColor3 = mainColor
-			object.Highlight.FillColor = mainColor
-			object.Highlight.OutlineColor = mainColor
-			object.Highlight.Adornee = character
-			object.Highlight.Enabled = Config.ESP.Chams
-			if minX then
-				object.Holder.Visible = true
-				object.Holder.Position = UDim2.fromOffset(minX, minY)
-				object.Holder.Size = UDim2.fromOffset(width, height)
-				object.Box.Visible = Config.ESP.Boxes
-				object.Name.Visible = Config.ESP.Names
-				object.Name.Text = getDisplayName(character)
-				local health, maxHealth = getHealth(character)
-				local ratio = math.clamp(health / math.max(maxHealth, 1), 0, 1)
-				object.HealthBack.Visible = Config.ESP.Health
-				object.HealthFill.Size = UDim2.fromScale(1, ratio)
-				local info = {}
-				if Config.ESP.Health then
-					table.insert(info, ("%d HP"):format(math.max(0, math.floor(health + 0.5))))
-				end
-				if Config.ESP.Distance then
-					table.insert(info, ("%d studs"):format(math.floor(distance + 0.5)))
-				end
-				object.Info.Visible = #info > 0
-				object.Info.Text = table.concat(info, "  •  ")
-				if Config.ESP.Tracers then
-					local from = Vector2.new(camera.ViewportSize.X * 0.5, camera.ViewportSize.Y - 2)
-					local to = Vector2.new(minX + width * 0.5, minY + height)
-					updateTracer(object.Tracer, from, to)
-					object.Tracer.Visible = true
-				else
-					object.Tracer.Visible = false
-				end
-			else
-				object.Holder.Visible = false
-				object.Tracer.Visible = false
-			end
-		end)
-		for character in pairs(espObjects) do
-			if not seen[character] or not isEnemyCharacter(character) then
-				removeESP(character)
-			end
-		end
-	end
-
-	local FOVRing = Instance.new("Frame")
-	FOVRing.Name = "FOV"
-	FOVRing.AnchorPoint = Vector2.new(0.5, 0.5)
-	FOVRing.BackgroundTransparency = 1
-	FOVRing.BorderSizePixel = 0
-	FOVRing.ZIndex = 2
-	FOVRing.Parent = ScreenGui
-
-	local FOVCorner = Instance.new("UICorner")
-	FOVCorner.CornerRadius = UDim.new(1, 0)
-	FOVCorner.Parent = FOVRing
-
-	local FOVStroke = Instance.new("UIStroke")
-	FOVStroke.Thickness = 1
-	FOVStroke.Transparency = 0.25
-	FOVStroke.Color = Color3.fromRGB(255, 255, 255)
-	FOVStroke.Parent = FOVRing
-
-	local function updateFOV()
-		local center = screenCenter()
-		local diameter = math.max(tonumber(Config.Aim.FOV) or 1, 1) * 2
-		FOVRing.Position = UDim2.fromOffset(center.X, center.Y)
-		FOVRing.Size = UDim2.fromOffset(diameter, diameter)
-		FOVRing.Visible = Config.Aim.ShowFOV and Config.Aim.Enabled and localCombatReady()
-		FOVStroke.Color = lockedTarget
-			and Color3.fromRGB(100, 255, 125)
-			or Color3.fromRGB(255, 255, 255)
-	end
-
-	--// UI
-	local WindUI = getWindUILibrary()
-	local window = createPotentWindow(WindUI, "POTENTHUB_ONETAP", "+1 One Tap")
-
-	local combatTab = window:Tab({ Title = "⚔️ Combat", Icon = "swords" })
-	local legitTab = window:Tab({ Title = "🎯 Legit", Icon = "crosshair" })
-	local rageTab = window:Tab({ Title = "💀 Rage", Icon = "skull" })
-	local visualTab = window:Tab({ Title = "👁️ Visuals", Icon = "eye" })
-	local settingsTab = window:Tab({ Title = "⚙️ Settings", Icon = "settings" })
-
-	local UIControls = {}
-	local syncUIFromConfig
-	local LegitModeLabel
-	local RageModeLabel
-	local BackendStatusLabel
-	local cleanup
-	local running = true
-
-	local function backendStatusText()
-		local tagged = #collectionService:GetTagged("Character")
-		return ("Backend • Character tag: %d • %s"):format(tagged, NativeWeaponStatus)
-	end
-
-	combatTab:Section({ Title = "🔗 Game Integration" })
-	BackendStatusLabel = combatTab:Paragraph({ Title = "Backend Status", Desc = backendStatusText() })
-	combatTab:Paragraph({ Title = "Info", Desc = "Targets use Character tag + Head/Torso rigs. Aimbot only locks onto visible enemies." })
-
-	combatTab:Section({ Title = "🎯 Auto Aim" })
-	UIControls.AimEnabled = combatTab:Toggle({
-		Title = "Enable Auto Aim",
-		Value = Config.Aim.Enabled,
-		Callback = function(value)
-			Config.Aim.Enabled = value
-			if not value then clearTarget() end
-		end,
-	})
-
-	UIControls.AimActivation = combatTab:Dropdown({
-		Title = "Aim Activation",
-		Values = {"Hold RMB", "Always On"},
-		Value = Config.Aim.HoldRMB and "Hold RMB" or "Always On",
-		Callback = function(value)
-			Config.Aim.HoldRMB = value ~= "Always On"
-			Config.AimMode = "Custom"
-			clearTarget()
-		end,
-	})
-
-	combatTab:Section({ Title = "🔫 Auto Shoot" })
-	UIControls.AutoShoot = combatTab:Toggle({
-		Title = "Enable Auto Shoot",
-		Value = Config.Aim.AutoShoot,
-		Callback = function(value)
-			Config.Aim.AutoShoot = value
-			lastAutoShootTarget = nil
-			lastAutoShotAttemptAt = 0
-		end,
-	})
-
-	UIControls.AutoShootButton = combatTab:Dropdown({
-		Title = "Auto Shoot Button",
-		Values = {"RMB", "LMB"},
-		Value = normalizeAutoShootButton(Config.Aim.AutoShootButton),
-		Callback = function(value)
-			Config.Aim.AutoShootButton = normalizeAutoShootButton(value)
-			lastAutoShootTarget = nil
-		end,
-	})
-
-	UIControls.AutoShootRadius = combatTab:Slider({
-		Title = "Shoot Radius (px)",
-		Step = 1,
-		Value = { Min = 2, Max = 30, Default = Config.Aim.AutoShootRadius },
-		Callback = function(value) Config.Aim.AutoShootRadius = value end,
-	})
-
-	UIControls.AutoShootDelay = combatTab:Slider({
-		Title = "Extra Shot Delay (s)",
-		Step = 0.01,
-		Value = { Min = 0, Max = 0.50, Default = Config.Aim.AutoShootDelay },
-		Callback = function(value) Config.Aim.AutoShootDelay = value end,
-	})
-
-	combatTab:Paragraph({ Title = "Auto Shoot", Desc = "Uses the native WeaponClient.fire when available." })
-
-	combatTab:Section({ Title = "🎯 Aim Point / Lock" })
-	UIControls.AimPoint = combatTab:Dropdown({
-		Title = "Aim Point",
-		Values = {"Head", "Torso", "Closest Part"},
-		Value = Config.Aim.AimPoint,
-		Callback = function(value)
-			Config.Aim.AimPoint = value or "Head"
-			Config.AimMode = "Custom"
-			clearTarget()
-		end,
-	})
-
-	UIControls.StickyTarget = combatTab:Toggle({
-		Title = "Sticky Target",
-		Value = Config.Aim.StickyTarget,
-		Callback = function(value)
-			Config.Aim.StickyTarget = value
-			if not value then clearTarget() end
-		end,
-	})
-
-	combatTab:Section({ Title = "🎯 FOV / Response" })
-	UIControls.ShowFOV = combatTab:Toggle({
-		Title = "Show FOV Circle",
-		Value = Config.Aim.ShowFOV,
-		Callback = function(value) Config.Aim.ShowFOV = value end,
-	})
-
-	UIControls.FOV = combatTab:Slider({
-		Title = "FOV Radius (px)",
-		Step = 5,
-		Value = { Min = 40, Max = 700, Default = Config.Aim.FOV },
-		Callback = function(value)
-			Config.Aim.FOV = value
-			Config.AimMode = "Custom"
-		end,
-	})
-
-	UIControls.AimSpeed = combatTab:Slider({
-		Title = "Aim Speed",
-		Step = 1,
-		Value = { Min = 4, Max = 140, Default = Config.Aim.SmoothSpeed },
-		Callback = function(value)
-			Config.Aim.SmoothSpeed = value
-			Config.AimMode = "Custom"
-		end,
-	})
-
-	UIControls.AimDistance = combatTab:Slider({
-		Title = "Aim Max Distance (studs)",
-		Step = 25,
-		Value = { Min = 100, Max = 1500, Default = Config.Aim.MaxDistance },
-		Callback = function(value)
-			Config.Aim.MaxDistance = value
-			clearTarget()
-		end,
-	})
-
-	combatTab:Section({ Title = "🧠 Advanced Targeting" })
-	UIControls.TargetPriority = combatTab:Dropdown({
-		Title = "Target Priority",
-		Values = {"Crosshair", "Distance", "Low Health", "Hybrid"},
-		Value = Config.Aim.TargetPriority,
-		Callback = function(value)
-			Config.Aim.TargetPriority = value or "Hybrid"
-			clearTarget()
-		end,
-	})
-
-	UIControls.Prediction = combatTab:Toggle({
-		Title = "Projectile Prediction",
-		Value = Config.Aim.Prediction,
-		Callback = function(value) Config.Aim.Prediction = value end,
-	})
-
-	UIControls.BulletSpeed = combatTab:Slider({
-		Title = "Projectile Speed (studs/s)",
-		Step = 50,
-		Value = { Min = 500, Max = 6000, Default = Config.Aim.BulletSpeed },
-		Callback = function(value) Config.Aim.BulletSpeed = value end,
-	})
-
-	UIControls.PredictionExtra = combatTab:Slider({
-		Title = "Extra Prediction (s)",
-		Step = 0.005,
-		Value = { Min = 0, Max = 0.20, Default = Config.Aim.PredictionExtra },
-		Callback = function(value) Config.Aim.PredictionExtra = value end,
-	})
-
-	UIControls.PredictionSmoothing = combatTab:Slider({
-		Title = "Prediction Stability",
-		Step = 0.01,
-		Value = { Min = 0, Max = 0.95, Default = Config.Aim.PredictionSmoothing },
-		Callback = function(value) Config.Aim.PredictionSmoothing = value end,
-	})
-
-	UIControls.MaxPredictionOffset = combatTab:Slider({
-		Title = "Max Prediction Offset (studs)",
-		Step = 1,
-		Value = { Min = 0, Max = 30, Default = Config.Aim.MaxPredictionOffset },
-		Callback = function(value) Config.Aim.MaxPredictionOffset = value end,
-	})
-
-	UIControls.AdaptiveSmoothing = combatTab:Toggle({
-		Title = "Adaptive Smoothing",
-		Value = Config.Aim.AdaptiveSmoothing,
-		Callback = function(value) Config.Aim.AdaptiveSmoothing = value end,
-	})
-
-	UIControls.MicroSnap = combatTab:Slider({
-		Title = "Micro Snap Radius (px)",
-		Step = 0.5,
-		Value = { Min = 0, Max = 10, Default = Config.Aim.MicroSnapRadius },
-		Callback = function(value) Config.Aim.MicroSnapRadius = value end,
-	})
-
-	UIControls.SwitchDelay = combatTab:Slider({
-		Title = "Target Switch Delay (s)",
-		Step = 0.01,
-		Value = { Min = 0, Max = 0.30, Default = Config.Aim.SwitchDelay },
-		Callback = function(value) Config.Aim.SwitchDelay = value end,
-	})
-
-	UIControls.SwitchThreshold = combatTab:Slider({
-		Title = "Switch Improvement Required",
-		Step = 0.01,
-		Value = { Min = 0, Max = 0.50, Default = Config.Aim.SwitchThreshold },
-		Callback = function(value) Config.Aim.SwitchThreshold = value end,
-	})
-
-	UIControls.LockGrace = combatTab:Slider({
-		Title = "Target Lock Grace (s)",
-		Step = 0.01,
-		Value = { Min = 0, Max = 0.50, Default = Config.Aim.LockGrace },
-		Callback = function(value) Config.Aim.LockGrace = value end,
-	})
-
-	--// Legit
-	local function updateAimModeLabels()
-		local text = "Current mode • " .. tostring(Config.AimMode or "Custom")
-		if LegitModeLabel and LegitModeLabel.SetDesc then LegitModeLabel:SetDesc(text) end
-		if RageModeLabel and RageModeLabel.SetDesc then RageModeLabel:SetDesc(text) end
-	end
-
-	local function applyAimPreset(name, values, notification)
-		Config.AimMode = name
-		for key, value in pairs(values or {}) do
-			if Config.Aim[key] ~= nil then
-				Config.Aim[key] = value
-			end
-		end
-		clearTarget()
-		if syncUIFromConfig then syncUIFromConfig() end
-		updateAimModeLabels()
-		WindUI:Notify({ Title = name, Content = notification or (name .. " applied"), Duration = 2.2 })
-	end
-
-	legitTab:Section({ Title = "🎯 Legit Aim" })
-	LegitModeLabel = legitTab:Paragraph({ Title = "Current Mode", Desc = "Current mode • " .. tostring(Config.AimMode) })
-
-	legitTab:Button({
-		Title = "Legit • Subtle",
-		Callback = function()
-			applyAimPreset("Legit • Subtle", {
-				Enabled = true, HoldRMB = true, AimPoint = "Head",
-				FOV = 75, SmoothSpeed = 12, StickyTarget = true, StickyMultiplier = 1.15,
-				Prediction = true, BulletSpeed = 3850, PredictionExtra = 0,
-				PredictionSmoothing = 0.84, MaxPredictionOffset = 10, AdaptiveSmoothing = true,
-				MicroSnapRadius = 0.5, TargetPriority = "Hybrid",
-				SwitchDelay = 0.12, SwitchThreshold = 0.22, LockGrace = 0.24, ShowFOV = false,
-			}, "Hold RMB • 75px FOV • smooth visible-target aim")
-		end,
-	})
-
-	legitTab:Button({
-		Title = "Legit • Balanced",
-		Callback = function()
-			applyAimPreset("Legit • Balanced", {
-				Enabled = true, HoldRMB = true, AimPoint = "Head",
-				FOV = 120, SmoothSpeed = 22, StickyTarget = true, StickyMultiplier = 1.22,
-				Prediction = true, BulletSpeed = 3850, PredictionExtra = 0,
-				PredictionSmoothing = 0.78, MaxPredictionOffset = 14, AdaptiveSmoothing = true,
-				MicroSnapRadius = 1, TargetPriority = "Hybrid",
-				SwitchDelay = 0.08, SwitchThreshold = 0.18, LockGrace = 0.21, ShowFOV = true,
-			}, "Hold RMB • 120px FOV • balanced response")
-		end,
-	})
-
-	legitTab:Button({
-		Title = "Legit • Strong",
-		Callback = function()
-			applyAimPreset("Legit • Strong", {
-				Enabled = true, HoldRMB = true, AimPoint = "Head",
-				FOV = 190, SmoothSpeed = 38, StickyTarget = true, StickyMultiplier = 1.30,
-				Prediction = true, BulletSpeed = 3850, PredictionExtra = 0,
-				PredictionSmoothing = 0.72, MaxPredictionOffset = 18, AdaptiveSmoothing = true,
-				MicroSnapRadius = 1.5, TargetPriority = "Crosshair",
-				SwitchDelay = 0.05, SwitchThreshold = 0.12, LockGrace = 0.17, ShowFOV = true,
-			}, "Hold RMB • 190px FOV • fast visible-target response")
-		end,
-	})
-
-	--// Rage
-	rageTab:Section({ Title = "💀 Rage Aim" })
-	RageModeLabel = rageTab:Paragraph({ Title = "Current Mode", Desc = "Current mode • " .. tostring(Config.AimMode) })
-
-	rageTab:Button({
-		Title = "Rage • Visible",
-		Callback = function()
-			applyAimPreset("Rage • Visible", {
-				Enabled = true, HoldRMB = false, AimPoint = "Head",
-				FOV = 520, SmoothSpeed = 100, StickyTarget = true, StickyMultiplier = 1.50,
-				Prediction = true, BulletSpeed = 3850, PredictionExtra = 0,
-				PredictionSmoothing = 0.60, MaxPredictionOffset = 22, AdaptiveSmoothing = false,
-				MicroSnapRadius = 5, TargetPriority = "Crosshair",
-				SwitchDelay = 0, SwitchThreshold = 0.06, LockGrace = 0.12, ShowFOV = true,
-			}, "Always On • large FOV • fast • visible targets only")
-		end,
-	})
-
-	rageTab:Button({
-		Title = "Rage • Max",
-		Callback = function()
-			applyAimPreset("Rage • Max", {
-				Enabled = true, HoldRMB = false, AimPoint = "Closest Part",
-				FOV = 700, SmoothSpeed = 140, StickyTarget = true, StickyMultiplier = 1.65,
-				Prediction = true, BulletSpeed = 3850, PredictionExtra = 0,
-				PredictionSmoothing = 0.52, MaxPredictionOffset = 25, AdaptiveSmoothing = false,
-				MicroSnapRadius = 10, TargetPriority = "Crosshair",
-				SwitchDelay = 0, SwitchThreshold = 0.02, LockGrace = 0.10, ShowFOV = true,
-			}, "Always On • max FOV / response • visible targets only")
-		end,
-	})
-
-	rageTab:Section({ Title = "🛠️ Helpers" })
-	rageTab:Button({
-		Title = "Always On",
-		Callback = function()
-			Config.AimMode = "Rage • Custom"
-			Config.Aim.Enabled = true
-			Config.Aim.HoldRMB = false
-			clearTarget()
-			if syncUIFromConfig then syncUIFromConfig() end
-		end,
-	})
-
-	rageTab:Button({
-		Title = "Head Only",
-		Callback = function()
-			Config.AimMode = "Rage • Custom"
-			Config.Aim.AimPoint = "Head"
-			clearTarget()
-			if syncUIFromConfig then syncUIFromConfig() end
-		end,
-	})
-
-	--// Visuals
-	visualTab:Section({ Title = "👁️ ESP" })
-	UIControls.ESPEnabled = visualTab:Toggle({
-		Title = "Enable ESP",
-		Value = Config.ESP.Enabled,
-		Callback = function(value)
-			Config.ESP.Enabled = value
-			if not value then
-				for _, object in pairs(espObjects) do
-					hideESPObject(object)
-				end
-			end
-		end,
-	})
-
-	UIControls.Boxes = visualTab:Toggle({
-		Title = "Boxes",
-		Value = Config.ESP.Boxes,
-		Callback = function(value) Config.ESP.Boxes = value end,
-	})
-
-	UIControls.Names = visualTab:Toggle({
-		Title = "Names",
-		Value = Config.ESP.Names,
-		Callback = function(value) Config.ESP.Names = value end,
-	})
-
-	UIControls.Health = visualTab:Toggle({
-		Title = "Health",
-		Value = Config.ESP.Health,
-		Callback = function(value) Config.ESP.Health = value end,
-	})
-
-	UIControls.Distance = visualTab:Toggle({
-		Title = "Distance",
-		Value = Config.ESP.Distance,
-		Callback = function(value) Config.ESP.Distance = value end,
-	})
-
-	UIControls.Chams = visualTab:Toggle({
-		Title = "Chams",
-		Value = Config.ESP.Chams,
-		Callback = function(value) Config.ESP.Chams = value end,
-	})
-
-	UIControls.Tracers = visualTab:Toggle({
-		Title = "Tracers",
-		Value = Config.ESP.Tracers,
-		Callback = function(value) Config.ESP.Tracers = value end,
-	})
-
-	visualTab:Section({ Title = "📏 ESP Range" })
-	UIControls.ESPDistance = visualTab:Slider({
-		Title = "ESP Max Distance (studs)",
-		Step = 50,
-		Value = { Min = 100, Max = 3000, Default = Config.ESP.MaxDistance },
-		Callback = function(value) Config.ESP.MaxDistance = value end,
-	})
-
-	visualTab:Paragraph({ Title = "Info", Desc = "The current aim target is highlighted green; other enemies stay red." })
-
-	--// Sync
-	syncUIFromConfig = function()
-		local function safeSet(control, value)
-			if control and control.Set then
-				pcall(function() control:Set(value) end)
-			end
-		end
-
-		safeSet(UIControls.AimEnabled, Config.Aim.Enabled)
-		safeSet(UIControls.AimActivation, Config.Aim.HoldRMB and "Hold RMB" or "Always On")
-		safeSet(UIControls.AutoShoot, Config.Aim.AutoShoot)
-		safeSet(UIControls.AutoShootButton, normalizeAutoShootButton(Config.Aim.AutoShootButton))
-		safeSet(UIControls.AutoShootRadius, Config.Aim.AutoShootRadius)
-		safeSet(UIControls.AutoShootDelay, Config.Aim.AutoShootDelay)
-		safeSet(UIControls.AimPoint, Config.Aim.AimPoint)
-		safeSet(UIControls.StickyTarget, Config.Aim.StickyTarget)
-		safeSet(UIControls.ShowFOV, Config.Aim.ShowFOV)
-		safeSet(UIControls.FOV, Config.Aim.FOV)
-		safeSet(UIControls.AimSpeed, Config.Aim.SmoothSpeed)
-		safeSet(UIControls.AimDistance, Config.Aim.MaxDistance)
-		safeSet(UIControls.TargetPriority, Config.Aim.TargetPriority)
-		safeSet(UIControls.Prediction, Config.Aim.Prediction)
-		safeSet(UIControls.BulletSpeed, Config.Aim.BulletSpeed)
-		safeSet(UIControls.PredictionExtra, Config.Aim.PredictionExtra)
-		safeSet(UIControls.PredictionSmoothing, Config.Aim.PredictionSmoothing)
-		safeSet(UIControls.MaxPredictionOffset, Config.Aim.MaxPredictionOffset)
-		safeSet(UIControls.AdaptiveSmoothing, Config.Aim.AdaptiveSmoothing)
-		safeSet(UIControls.MicroSnap, Config.Aim.MicroSnapRadius)
-		safeSet(UIControls.SwitchDelay, Config.Aim.SwitchDelay)
-		safeSet(UIControls.SwitchThreshold, Config.Aim.SwitchThreshold)
-		safeSet(UIControls.LockGrace, Config.Aim.LockGrace)
-		safeSet(UIControls.ESPEnabled, Config.ESP.Enabled)
-		safeSet(UIControls.Boxes, Config.ESP.Boxes)
-		safeSet(UIControls.Names, Config.ESP.Names)
-		safeSet(UIControls.Health, Config.ESP.Health)
-		safeSet(UIControls.Distance, Config.ESP.Distance)
-		safeSet(UIControls.Chams, Config.ESP.Chams)
-		safeSet(UIControls.Tracers, Config.ESP.Tracers)
-		safeSet(UIControls.ESPDistance, Config.ESP.MaxDistance)
-
-		clearTarget()
-		updateAimModeLabels()
-	end
-
-	--// Settings
-	settingsTab:Section({ Title = "🎮 Info" })
-	settingsTab:Paragraph({ Title = "Place ID", Desc = tostring(game.PlaceId) })
-
-	settingsTab:Button({
-		Title = "Re-scan Native Weapon Client",
-		Callback = function()
-			resolveNativeWeaponClient()
-			if BackendStatusLabel and BackendStatusLabel.SetDesc then
-				BackendStatusLabel:SetDesc(backendStatusText())
-			end
-			WindUI:Notify({ Title = "POTENT", Content = NativeWeaponStatus, Duration = 2 })
-		end,
-	})
-
-	settingsTab:Button({
-		Title = "Reset Aim + ESP Defaults",
-		Callback = function()
-			Config = deepCopy(DefaultConfig)
-			clearTarget()
-			velocityCache = setmetatable({}, {__mode = "k"})
-			if syncUIFromConfig then syncUIFromConfig() end
-			WindUI:Notify({ Title = "POTENT", Content = "Aim and ESP defaults restored", Duration = 2 })
-		end,
-	})
-
-	settingsTab:Button({
-		Title = "Unload Script",
-		Callback = function()
-			if cleanup then cleanup() end
-		end,
-	})
-
-	syncUIFromConfig()
-
-	--// Main loop
-	local renderConnection
-	local statusAccumulator = 0
-
-	renderConnection = runService.RenderStepped:Connect(function(dt)
-		if not running then return end
-		applyAim(dt)
-		updateESP()
-		updateFOV()
-		statusAccumulator = statusAccumulator + dt
-		if statusAccumulator >= 1 then
-			statusAccumulator = 0
-			if BackendStatusLabel and BackendStatusLabel.SetDesc then
-				BackendStatusLabel:SetDesc(backendStatusText())
-			end
-		end
-	end)
-
-	cleanup = function()
-		if not running then return end
-		running = false
-		if renderConnection then
-			pcall(function() renderConnection:Disconnect() end)
-			renderConnection = nil
-		end
-		clearTarget()
-		for character in pairs(espObjects) do
-			removeESP(character)
-		end
-		if ScreenGui then pcall(function() ScreenGui:Destroy() end) end
-		if window and type(window.Destroy) == "function" then
-			pcall(function() window:Destroy() end)
-		end
-	end
-
-	WindUI:Notify({
-		Title = "⚡ POTENT HUB",
-		Content = "One Tap loaded • enable options manually",
-		Duration = 3,
-	})
 end
 
 -- ============================================================
